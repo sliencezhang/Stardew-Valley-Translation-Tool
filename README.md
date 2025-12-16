@@ -106,11 +106,11 @@
 - Python 3.8+
 - PySide6
 - requests
-- pandas
+- hjson
+- pyahocorasick
 
 ### 构建可执行文件
 - 需要安装Microsoft Visual Studio c++ 2022
-- 或使用pyinstall打包，文件体积大一倍
 
 使用 Nuitka 打包为单文件：
 ```bash
@@ -121,6 +121,8 @@ nuitka --standalone --onefile --windows-console-mode=disable --windows-disable-c
 ```bash
 python build_tool.py --mode onefile
 ```
+
+- 或使用pyinstall打包，文件体积大一倍
 
 ### 项目结构
 ```
@@ -161,10 +163,8 @@ A: 直接复制整个项目文件夹即可，所有配置和缓存都在其中�
 
 ### v1.0
 - 全新的现代化界面
-- 支持单文件打包，无需安装Python
-- 优化翻译引擎，提高翻译质量
+- 单文件打包，体积更小，使用方便，无需安装Python
 - 新增主题切换功能
-- 改进质量检查算法
 
 
 ## 🙏 致谢
