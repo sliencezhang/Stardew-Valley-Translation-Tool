@@ -1,4 +1,16 @@
+# GUI框架
 PySide6==6.10.1
+
+# 网络请求
 requests==2.32.5
+urllib3>=2.0.0
+
+# 数据处理
 hjson==3.1.0
+packaging>=24.0.0
+
+# 文本处理
 pyahocorasick==2.2.0
+
+# 开发工具（可选，仅打包时需要）
+# nuitka>=2.0.0
