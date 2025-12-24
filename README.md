@@ -58,22 +58,12 @@
 ## 🚀 快速开始
 
 1. **创建项目**：点击"新建项目"，选择项目文件夹
-2. **准备文件**：将需要翻译的模组文件放入对应文件夹
-   - `en/` - 英文原文文件
-   - `zh/` - 中文参考文件（可选）
-   - `output/` - 翻译输出文件
+2. **准备文件**：将需要翻译的模组文件放入对应拖选框
 3. **配置API**：在设置中配置翻译API密钥
 4. **开始翻译**：选择相应的翻译功能开始翻译
 5. **质量检查**：翻译完成后使用质量检查功能
 6. **导出结果**：翻译结果保存在output文件夹中
 
-## 🔧 支持的翻译API
-
-- DeepL
-- Google Translate
-- 百度翻译
-- 有道翻译
-- 其他兼容的翻译API
 
 ## 📁 项目结构
 
@@ -111,40 +101,26 @@
 
 ## ⚙️ 高级配置
 
-### 翻译API配置
+### 翻译配置
 在设置中可以配置：
 - API密钥
-- 请求间隔时间
-- 重试次数
-- 翻译语言对
+- API提供商
+- 翻译提示词
+- 每批翻译数量 以及 温度参数
+- 背景图片
 
 ### 术语管理
 - 支持导入/导出术语表
-- 可设置术语优先级
-- 支持正则表达式匹配
 
 ### 缓存设置
-- 可配置缓存有效期
 - 支持清理缓存
-- 可导出/导入缓存
 
 ## 🔨 开发指南
-
-### 环境要求
-- Python 3.8+
-- PySide6
-- requests
-- pandas
 
 ### 构建可执行文件
 使用 Nuitka 打包为单文件：
 ```bash
-nuitka --standalone --onefile --windows-console-mode=disable --windows-disable-console --enable-plugin=pyside6 --windows-icon-from-ico="resources/icons/logo.ico" --include-data-dir=resources=resources --output-dir=dist_onefile main.py
-```
-
-或使用自动打包脚本：
-```bash
-python build_tool.py --mode onefile
+python build_tool.py
 ```
 
 ### 项目结构
@@ -171,10 +147,7 @@ Stardew Valley Translation Tool/
 ## 🐛 常见问题
 
 ### Q: 翻译API调用失败怎么办？
-A: 检查API密钥是否正确，网络连接是否正常，必要时调整请求间隔时间。
-
-### Q: 程序启动失败？
-A: 确保Python版本符合要求，所有依赖已正确安装。
+A: 检查API密钥是否正确，网络连接是否正常。
 
 ### Q: 翻译结果不理想？
 A: 尝试调整翻译提示词，使用术语表，或切换到其他翻译API。
@@ -182,20 +155,6 @@ A: 尝试调整翻译提示词，使用术语表，或切换到其他翻译API�
 ### Q: 如何备份项目？
 A: 直接复制整个项目文件夹即可，所有配置和缓存都在其中。
 
-## 📝 更新日志
-
-### v2.0.0
-- 全新的现代化界面
-- 支持单文件打包，无需安装Python
-- 优化翻译引擎，提高翻译质量
-- 新增主题切换功能
-- 改进质量检查算法
-
-### v1.x.x
-- 基础翻译功能
-- 支持多种翻译API
-- 质量检查功能
-- 手动翻译界面
 
 ## 🤝 贡献指南
 
@@ -206,10 +165,6 @@ A: 直接复制整个项目文件夹即可，所有配置和缓存都在其中�
 3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 开启 Pull Request
-
-## 📄 许可证
-
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
 ## 🙏 致谢
 
