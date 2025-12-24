@@ -1137,6 +1137,12 @@ class GlobalSettingsDialog(QDialog):
         features_text.setTextFormat(Qt.TextFormat.RichText)
         features_text.setText(
             "<b>主要功能模块：</b><br><br>"
+            "<b>🔄 一键更新：</b><br>"
+            "• 自动完成所有步骤<br>"
+            "• 包括i18n文件翻译，manifest文件翻译，content文件翻译，Portraits文件夹复制（自己替换的肖像图不用手动复制了），config文件复制<br>"
+            "• 需先拖动下载的mod文件夹到步骤1，游戏中已有的mod文件夹到步骤2<br>"
+            "• 会先进行人名地名检查，不需要的话点击跳过选项<br>"
+            "• 会将完整mod文件夹输出到output，只需将游戏mod目录内对应文件夹内容删除，将output/mod文件夹的内容复制过去就完成更新<br><br>"
             "<b>🚀 智能翻译：</b><br>"
             "• 支持<b>增量翻译</b>，若添加对应的中文 json 会自动回填已翻译中文（default和zh是对应关系，不用修改）<br>"
             "• AI翻译自动保存<b>缓存</b>，随时可退出翻译，再次翻译时极速加载缓存<br>"

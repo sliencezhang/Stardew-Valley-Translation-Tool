@@ -27,7 +27,7 @@ class TabOneClickUpdate(QWidget):
         layout = QVBoxLayout()
 
         # 步骤1: 拖放英文mod文件夹
-        step1_group = QGroupBox("步骤1: 拖放英文mod文件夹")
+        step1_group = QGroupBox("步骤1: 拖放英文mod文件夹（必选）")
         step1_layout = QVBoxLayout(step1_group)
         
         # 说明文字
@@ -55,7 +55,7 @@ class TabOneClickUpdate(QWidget):
         layout.addWidget(step1_group)
 
         # 步骤2: 拖放中文mod文件夹
-        step2_group = QGroupBox("步骤2: 拖放中文mod文件夹")
+        step2_group = QGroupBox("步骤2: 拖放中文mod文件夹（必选）")
         step2_layout = QVBoxLayout(step2_group)
         
         # 说明文字

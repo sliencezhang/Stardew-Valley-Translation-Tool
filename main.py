@@ -8,6 +8,7 @@ if str(current_dir) not in sys.path:
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QFont, QIcon
+from version import VERSION
 
 
 def setup_application():
@@ -17,7 +18,7 @@ def setup_application():
 
     # 设置应用程序信息
     app.setApplicationName("星露谷翻译工具")
-    app.setApplicationVersion("1.0")
+    app.setApplicationVersion(VERSION)
     app.setOrganizationName("StardewTranslator")
 
     # 设置全局字体
