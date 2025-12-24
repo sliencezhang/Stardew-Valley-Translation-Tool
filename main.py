@@ -54,6 +54,28 @@ def show_splash_info():
     print("=" * 50)
 
 
+def initialize_user_directories():
+    """初始化用户目录结构"""
+    try:
+        from core.path_utils import get_user_data_directory, is_frozen, is_nuitka_onefile
+        
+        # 只在打包环境中初始化用户目录
+        if is_frozen() or is_nuitka_onefile():
+            user_dir = get_user_data_directory()
+            resources_dir = user_dir / "resources"
+            
+            # 创建用户目录和resources子目录
+            user_dir.mkdir(parents=True, exist_ok=True)
+            resources_dir.mkdir(parents=True, exist_ok=True)
+            
+            print(f"✅ 用户目录已初始化: {user_dir}")
+            return True
+        return False
+    except Exception as e:
+        print(f"⚠️ 初始化用户目录失败: {e}")
+        return False
+
+
 def main():
     """主函数"""
     # 显示启动信息
@@ -62,6 +84,9 @@ def main():
     # 检查依赖项
     if not check_dependencies():
         sys.exit(1)
+    
+    # 初始化用户目录（打包环境）
+    initialize_user_directories()
 
     # 创建应用程序
     app = setup_application()

@@ -17,6 +17,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from core.config import config
 from version import VERSION
+from core.signal_bus import signal_bus
 
 
 class UpdateChecker:
@@ -43,10 +44,8 @@ class UpdateChecker:
         # GitHub API 基础URL
         self.api_base = "https://api.github.com"
         
-        # 缓存文件路径（存储在项目resources目录）
-        self.cache_dir = Path("resources")
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self.cache_file = self.cache_dir / "update_cache.json"
+        # 缓存文件路径（动态获取，优先resources，失败则使用用户目录）
+        self.cache_file = None  # 将在需要时动态获取
         
         # 请求超时时间（秒）
         self.timeout = 10
@@ -182,23 +181,31 @@ class UpdateChecker:
         
         缓存策略：
         1. 如果force_check为True，强制检查
-        2. 如果缓存不存在，进行检查
-        3. 如果缓存超过7天，进行检查
-        4. 否则使用缓存结果
+        2. 读取缓存文件中的timestamp
+        3. 如果读取不到timestamp或超过7天，检查github
+        4. 检查github后保存timestamp
         """
+        from .path_utils import (get_readable_resource_path, get_resource_path, 
+                           is_frozen, is_nuitka_onefile)
+        
+        cache_file = get_readable_resource_path("update_cache.json")
+        env = "打包环境" if (is_frozen() or is_nuitka_onefile()) else "开发环境"
+        
         # 1. 检查是否需要跳过缓存
         if force_check:
-            print("强制检查更新...")
+            signal_bus.log_message.emit("INFO", f"[更新] {env} - 强制检查更新...", {})
             return self._check_and_cache()
         
         # 2. 检查缓存文件是否存在
-        if not self.cache_file.exists():
-            print("无缓存，开始检查更新...")
+        if not cache_file.exists():
+            # 确保用户目录的resources文件夹存在
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
+            signal_bus.log_message.emit("INFO", f"[更新] {env} - 无缓存，开始检查更新...", {})
             return self._check_and_cache()
         
         # 3. 读取缓存
         try:
-            with open(self.cache_file, 'r', encoding='utf-8') as f:
+            with open(cache_file, 'r', encoding='utf-8') as f:
                 cache_data = json.load(f)
             
             # 检查缓存时间
@@ -207,16 +214,21 @@ class UpdateChecker:
             
             # 如果缓存超过7天，重新检查
             if now - cache_time > timedelta(days=7):
-                print("缓存过期，重新检查...")
+                signal_bus.log_message.emit("INFO", f"[更新] {env} - 缓存过期，重新检查...", {})
                 return self._check_and_cache()
             
             # 使用缓存
-            print("使用缓存数据...")
+            signal_bus.log_message.emit("INFO", f"[更新] {env} - 使用缓存数据...", {})
             return cache_data.get('update_info', {})
             
         except (json.JSONDecodeError, KeyError, ValueError) as e:
-            print(f"缓存读取失败: {e}，重新检查...")
+            signal_bus.log_message.emit("ERROR", f"[更新] {env} - 缓存读取失败: {e}，重新检查...", {})
             return self._check_and_cache()
+    
+    def _get_cache_file(self) -> Path:
+        """获取缓存文件路径（只使用resources目录）"""
+        from .path_utils import get_resource_path
+        return get_resource_path("update_cache.json")
     
     def _check_and_cache(self) -> dict:
         """检查更新并缓存结果"""
@@ -255,18 +267,27 @@ class UpdateChecker:
     
     def _save_cache(self, update_info: dict):
         """保存检查结果到缓存"""
+        from .path_utils import get_writable_resource_path
+        
         cache_data = {
             "timestamp": datetime.now().isoformat(),
             "update_info": update_info,
             "repository": f"{self.repo_owner}/{self.repo_name}"
         }
         
+        from .path_utils import get_writable_resource_path, is_frozen, is_nuitka_onefile
+        
+        cache_file = get_writable_resource_path("update_cache.json")
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        env = "打包环境" if (is_frozen() or is_nuitka_onefile()) else "开发环境"
+        
         try:
-            with open(self.cache_file, 'w', encoding='utf-8') as f:
+            with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(cache_data, f, indent=2, ensure_ascii=False)
-            print(f"缓存已保存: {self.cache_file}")
+            signal_bus.log_message.emit("INFO", f"[更新] {env}，缓存保存到: {cache_file}", {})
         except Exception as e:
-            print(f"缓存保存失败: {e}")
+            signal_bus.log_message.emit("ERROR", f"[更新] 缓存保存失败: {e}", {})
     
     def display_update_info(self, update_info: dict):
         """显示更新信息"""
@@ -367,8 +388,7 @@ def check_for_updates_background():
             checker = UpdateChecker()
             update_info = checker.check_with_cache()
             if update_info.get('has_update'):
-                # 可以通过信号总线发送更新通知
-                from core.signal_bus import signal_bus
+                # 通过信号总线发送更新通知
                 signal_bus.update_available.emit(update_info)
         except Exception as e:
             print(f"后台更新检查失败: {e}")

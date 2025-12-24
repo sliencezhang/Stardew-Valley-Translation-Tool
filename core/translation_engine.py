@@ -120,6 +120,7 @@ class TranslationEngine(QObject):
             terminology_file = terminology_file.resolve()
             
             if terminology_file.exists():
+                signal_bus.log_message.emit("INFO", f"[术语表] 从文件加载默认术语: {terminology_file}", {})
                 terminology_data = file_tool.read_json_file(str(terminology_file))
                 for en_term, zh_term in terminology_data.items():
                     self.terminology_manager.add_terminology(en_term, zh_term)

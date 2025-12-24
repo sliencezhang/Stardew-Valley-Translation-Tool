@@ -846,7 +846,37 @@ class GlobalSettingsDialog(QDialog):
 
     def _load_default_terminology(self):
         """加载默认术语表"""
-        terminology_data = file_tool.read_json_file(str(self.terminology_file))
+        from core.path_utils import (get_readable_resource_path, get_writable_resource_path, 
+                                   is_frozen, is_nuitka_onefile, get_resource_path)
+        
+        
+        
+        load_path = get_readable_resource_path("terminology.json")
+        env = "打包环境" if (is_frozen() or is_nuitka_onefile()) else "开发环境"
+        signal_bus.log_message.emit("INFO", f"[术语表] {env}，从文件加载: {load_path}", {})
+        
+        # 如果是打包环境且用户目录下的文件不存在，需要从打包的resources复制
+        if env == "打包环境" and not load_path.exists():
+            # 从打包的resources目录读取默认数据
+            default_path = get_resource_path("terminology.json")
+            signal_bus.log_message.emit("INFO", f"[术语表] 用户目录文件不存在，从默认位置读取: {default_path}", {})
+            
+            if default_path.exists():
+                # 读取默认数据
+                terminology_data = file_tool.read_json_file(str(default_path))
+                # 保存到用户目录
+                save_path = get_writable_resource_path("terminology.json")
+                save_path.parent.mkdir(parents=True, exist_ok=True)
+                file_tool.save_json_file(terminology_data, str(save_path))
+                signal_bus.log_message.emit("INFO", f"[术语表] 已复制到用户目录: {save_path}", {})
+            else:
+                # 如果默认文件也不存在，使用空字典
+                terminology_data = {}
+                signal_bus.log_message.emit("WARNING", f"[术语表] 默认文件不存在: {default_path}", {})
+        else:
+            # 正常读取
+            terminology_data = file_tool.read_json_file(str(load_path))
+        
         self._load_dict_to_table(terminology_data, self.glossary_table)
 
     def _load_cache_data(self):
@@ -1048,7 +1078,16 @@ class GlobalSettingsDialog(QDialog):
 
     def _save_terminology_file(self, glossary: Dict[str, str]):
         """保存术语表到文件"""
-        file_tool.save_json_file(glossary, str(self.terminology_file))
+        from core.path_utils import get_writable_resource_path
+        
+        save_path = get_writable_resource_path("terminology.json")
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        from core.path_utils import is_frozen, is_nuitka_onefile
+        
+        env = "打包环境" if (is_frozen() or is_nuitka_onefile()) else "开发环境"
+        signal_bus.log_message.emit("INFO", f"[术语表] {env}，保存到: {save_path}", {})
+        file_tool.save_json_file(glossary, str(save_path))
 
     def _save_cache_data(self):
         """保存缓存数据"""

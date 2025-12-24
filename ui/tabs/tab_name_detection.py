@@ -457,6 +457,7 @@ class SmartNameExtractor:
         existing_terms = set()
         if os.path.exists(terminology_path):
             try:
+                signal_bus.log_message.emit("INFO", f"[术语表] 从文件加载现有术语: {terminology_path}", {})
                 with open(terminology_path, 'r', encoding='utf-8') as f:
                     terminology = json.load(f)
                 existing_terms = set(terminology.keys())

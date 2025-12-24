@@ -15,6 +15,7 @@ def is_frozen() -> bool:
 
 def is_nuitka_onefile() -> bool:
     """检查是否在Nuitka单文件模式下运行"""
+    # 首先检查sys.frozen
     if getattr(sys, 'frozen', False):
         # Nuitka会设置sys.frozen = True
         # 检查是否在临时目录（Nuitka单文件特征）
@@ -24,9 +25,27 @@ def is_nuitka_onefile() -> bool:
             'onefil', 
             'onefile_temp', 
             'onefile-build',
-            'appdata\\local\\temp'
+            'appdata\\local\\temp',
+            'onefil~1',  # 短文件名格式
+            '\\temp\\',
+            'local\\temp\\'
         ]
-        return any(indicator in exe_path for indicator in temp_indicators)
+        
+        # 检查是否包含临时目录标识
+        is_temp = any(indicator in exe_path for indicator in temp_indicators)
+        
+        # 额外检查：检查当前工作目录是否也是临时目录
+        import os
+        cwd = os.getcwd().lower()
+        is_cwd_temp = any(indicator in cwd for indicator in temp_indicators)
+        
+        return is_temp or is_cwd_temp
+    
+    # 如果sys.frozen不是True，但路径中包含临时目录特征，也可能是Nuitka
+    exe_path = str(sys.executable).lower()
+    if 'onefil' in exe_path or 'onefile' in exe_path:
+        return True
+        
     return False
 
 def is_pyinstaller() -> bool:
@@ -95,7 +114,6 @@ def get_application_directory() -> Path:
 
 def get_resource_path(relative_path: str) -> Path:
     """获取资源文件路径（兼容打包环境）"""
-    base_dir = get_application_directory()
     
     if is_pyinstaller():
         # PyInstaller：资源在sys._MEIPASS中
@@ -107,20 +125,71 @@ def get_resource_path(relative_path: str) -> Path:
         except:
             pass
     
-    # 普通情况或Nuitka
+    if is_nuitka_onefile():
+        # Nuitka单文件：资源在exe所在目录的resources子目录中
+        exe_dir = Path(sys.executable).parent
+        resource_path = exe_dir / "resources" / relative_path
+        return resource_path
+    
+    # 开发环境或其他情况
+    if is_frozen():
+        # 其他打包环境：使用exe所在目录
+        base_dir = Path(sys.executable).parent
+    else:
+        # 开发环境：使用项目根目录
+        base_dir = Path(__file__).parent.parent
+    
     resource_path = base_dir / relative_path
     return resource_path
 
+def get_writable_resource_path(relative_path: str) -> Path:
+    """获取可写的资源文件路径
+    
+    开发环境：返回 resources 目录下的路径
+    打包环境：返回用户数据目录下的 resources 子目录路径
+    
+    Args:
+        relative_path: 相对路径，如 "terminology.json"
+        
+    Returns:
+        Path: 可写的文件路径
+    """
+    if is_frozen() or is_nuitka_onefile():
+        # 打包环境：保存到用户数据目录下的 resources 子目录
+        user_dir = get_user_data_directory()
+        return user_dir / "resources" / relative_path
+    else:
+        # 开发环境：保存到 resources 目录
+        project_root = Path(__file__).parent.parent
+        return project_root / "resources" / relative_path
+
+def get_readable_resource_path(relative_path: str) -> Path:
+    """获取可读的资源文件路径
+    
+    打包环境：始终从用户数据目录下的resources子目录读取
+    开发环境：直接从 resources 读取
+    
+    Args:
+        relative_path: 相对路径，如 "terminology.json"
+        
+    Returns:
+        Path: 可读的文件路径
+    """
+    if is_frozen() or is_nuitka_onefile():
+        # 打包环境：始终从用户数据目录下的resources子目录读取
+        user_dir = get_user_data_directory()
+        user_path = user_dir / "resources" / relative_path
+        return user_path
+    else:
+        # 开发环境：直接从 resources 读取
+        project_root = Path(__file__).parent.parent
+        return project_root / "resources" / relative_path
+
 def get_user_data_directory() -> Path:
     """获取用户数据目录"""
-    if sys.platform == 'win32':
-        # Windows：使用AppData/Local
-        appdata = os.environ.get('LOCALAPPDATA', '')
-        if appdata:
-            return Path(appdata) / 'StardewTranslator'
-    
-    # 其他平台或失败：使用用户主目录
-    return Path.home() / '.stardewtranslator'
+    # 使用用户文档目录下的"Stardew Valley Translation Tool"路径
+    documents_dir = Path.home() / 'Documents' / 'Stardew Valley Translation Tool'
+    return documents_dir
 
 # 测试函数
 def test_path_functions():
