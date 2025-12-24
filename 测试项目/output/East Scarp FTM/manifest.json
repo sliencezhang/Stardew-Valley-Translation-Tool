@@ -1,0 +1,15 @@
+{
+  "Name": "[大型拓展]东斯卡普觅食设置",
+  "Author": "Lemurkat",
+  "Description": "控制东斯卡普的觅食和怪物生成",
+  "Version": "3.0.5",
+  "UniqueID": "Lemurkat.EastScarpe.FTM",
+  "UpdateKeys": [
+    "Nexus:???"
+  ],
+  "MinimumApiVersion": "2.5",
+  "ContentPackFor": {
+    "UniqueID": "Esca.FarmTypeManager",
+    "MinimumVersion": "1.4.4"
+  }
+}

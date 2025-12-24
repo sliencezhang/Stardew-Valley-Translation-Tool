@@ -1,0 +1,13 @@
+{
+  "$schema": "https://smapi.io/schemas/manifest.json",
+  "UniqueID": "atravita.EastScarp",
+  "Name": "[大型拓展]东斯卡普 C#",
+  "Author": "atravita",
+  "Version": "3.0.5",
+  "Description": "ES C# 组件",
+  "MinimumApiVersion": "4.1.10",
+  "EntryDll": "EastScarp.dll",
+  "UpdateKeys": [
+    "-1"
+  ]
+}

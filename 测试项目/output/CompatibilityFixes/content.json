@@ -1,0 +1,11 @@
+    {
+        "Format": "2.0",
+        "Changes": [
+            {
+                "Action": "Load",
+                "Priority": "Low",
+                "Target": "Maps/spring_cottage, Maps/summer_cottage, Maps/fall_cottage, Maps/winter_cottage, Maps/balcony_house, Maps/spring_EastScarpe, Maps/summer_EastScarpe, Maps/fall_EastScarpe, Maps/winter_EastScarpe, Maps/spring_lighthouse, Maps/summer_lighthouse, Maps/fall_lighthouse, Maps/winter_lighthouse, Maps/spring_rockpools, Maps/summer_rockpools, Maps/fall_rockpools, Maps/winter_rockpools, Maps/spring_inn, Maps/summer_inn, Maps/fall_inn, Maps/winter_inn, Maps/spring_himeoutdoors, Maps/summer_himeoutdoors, Maps/fall_himeoutdoors, Maps/winter_himeoutdoors, Maps/Flooring, Maps/lemur_coffeeShop, Maps/LemurCustom",
+                "FromFile": "TileSheets/{{TargetWithoutPath}}.png"
+            }
+        ]
+    }

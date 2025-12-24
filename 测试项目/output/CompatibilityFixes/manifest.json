@@ -1,0 +1,13 @@
+{
+  "Name": "[大型拓展]东斯卡普图块修复",
+  "Author": "Lemurkat",
+  "Description": "防止额外地图崩溃",
+  "Version": "3.0.5",
+  "UniqueID": "LemurKat.EastScarpe.CP",
+  "UpdateKeys": [
+    "Nexus:???"
+  ],
+  "ContentPackFor": {
+    "UniqueID": "Pathoschild.ContentPatcher"
+  }
+}

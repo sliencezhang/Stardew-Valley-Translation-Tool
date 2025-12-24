@@ -1,0 +1,14 @@
+{
+  "$schema": "https://smapi.io/schemas/manifest.json",
+  "UniqueID": "ES.BarberShop",
+  "Name": "[大型拓展]ES-理发店",
+  "Author": "mushymato",
+  "Version": "3.0.5",
+  "Description": "东斯卡普的理发店 - 与安卓不兼容",
+  "MinimumApiVersion": "4.3.2",
+  "MinimumGameVersion": "1.6.15",
+  "EntryDll": "ESBarberShop.dll",
+  "UpdateKeys": [
+    "GitHub:Mushymato/ESBarberShop"
+  ]
+}
