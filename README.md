@@ -1,8 +1,21 @@
-# 星露谷翻译工具 v1.0
+# 星露谷翻译工具 v1.1
 
 专业的星露谷游戏文本翻译工具，支持智能翻译、增量翻译、质量检查等功能。
 
 使用教程：https://www.bilibili.com/video/BV15NqbBAEQN
+
+## 🌟 v1.1更新内容
+- 一键更新页面，拖入下载的英文mod文件夹和游戏mod目录内的中文mod文件夹
+  - 会自动开始检查人名地名，手动确认后，开始翻译 i18n 内的json、manifest.json、content.json
+    - 若i18n内是文件形式，会自动将content提取的键值对翻译后追加在zh.json内容上方（会去重，优先使用default或zh中已有的）
+    - 若i18n内是文件夹形式，则提取的content键值对会保存在output/mod文件夹/i18n/配置菜单翻译.json，由用户确认添加
+  - 自动将中文mod文件夹的**config.json**，以及**中文mod文件夹/assets/Portraits** 覆盖复制到output对应的位置
+    - 避免了用户还需手动将美化的精灵图复制到下载的mod中
+  - 完成上述流程后，自动开始质量检查，若不需要，直接关闭即可
+  - 输出在**项目文件夹/output/mod文件夹**，此文件夹**包含mod所有资源**，只需要将文件夹内的文件复制到游戏mod对应文件夹中即可
+- 新增了通过github api自动检查更新的功能
+- 将术语表、提示词保存在临时目录 改为 保存在 %HOMEPATH%\Documents\Stardew Valley Translation Tool\resources 中，避免被系统自动清理
+- 修改了提示词，避免DeepSeek输出多余解释内容以及自动生成变量
 
 ## 🌟 功能特点
 
