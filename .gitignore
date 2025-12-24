@@ -195,7 +195,6 @@ __pycache__/
 *.json
 !resources/*.json
 content*.json
-build*.py
 package.py
 sun_moon*.py
 test.py
