@@ -219,15 +219,28 @@ class UpdateChecker:
             with open(cache_file, 'r', encoding='utf-8') as f:
                 cache_data = json.load(f)
             
-            # 检查版本一致性 - 新增逻辑
             update_info = cache_data.get('update_info', {})
+            cached_current_version = update_info.get('current_version')
             cached_latest_version = update_info.get('latest_version')
+            
+            # 检查缓存中的当前版本是否与实际版本一致
+            if cached_current_version and cached_current_version != self.current_version:
+                signal_bus.log_message.emit("INFO", f"[更新] {env} - 检测到版本变化：{cached_current_version} -> {self.current_version}，重新检查更新", {})
+                # 版本发生变化，需要重新检查更新
+                return self._check_and_cache()
+            
+            # 检查版本一致性
             if cached_latest_version:
                 # 如果当前版本等于缓存中的最新版本，说明已经是最新版本
                 if self.parse_version(self.current_version) >= self.parse_version(cached_latest_version):
                     signal_bus.log_message.emit("INFO", f"[更新] {env} - 当前版本{self.current_version}已是最新，清除更新标记", {})
-                    # 更新缓存为无更新状态
-                    no_update_result = {"has_update": False, "is_latest": True}
+                    # 更新缓存为无更新状态，确保current_version正确
+                    no_update_result = {
+                        "has_update": False, 
+                        "is_latest": True,
+                        "current_version": self.current_version,
+                        "latest_version": cached_latest_version
+                    }
                     self._save_cache(no_update_result)
                     return no_update_result
             
@@ -240,7 +253,8 @@ class UpdateChecker:
                 signal_bus.log_message.emit("INFO", f"[更新] {env} - 缓存过期，重新检查...", {})
                 return self._check_and_cache()
             
-            # 使用缓存
+            # 使用缓存，但确保current_version是最新的
+            update_info['current_version'] = self.current_version
             signal_bus.log_message.emit("INFO", f"[更新] {env} - 使用缓存数据...", {})
             return update_info
             
@@ -298,6 +312,10 @@ class UpdateChecker:
     def _save_cache(self, update_info: dict):
         """保存检查结果到缓存"""
         from .path_utils import get_writable_resource_path
+        
+        # 确保update_info包含正确的current_version
+        if 'current_version' not in update_info:
+            update_info['current_version'] = self.current_version
         
         cache_data = {
             "timestamp": datetime.now().isoformat(),
