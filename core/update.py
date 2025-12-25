@@ -159,9 +159,19 @@ class UpdateChecker:
             }
         elif latest_ver < current_ver:
             # 本地版本比最新版本还新（可能是开发版）
-            return {"has_update": False, "is_dev": True}
+            return {
+                "has_update": False, 
+                "is_dev": True,
+                "current_version": str(current_ver),
+                "latest_version": str(latest_ver)
+            }
         else:
-            return {"has_update": False, "is_latest": True}
+            return {
+                "has_update": False, 
+                "is_latest": True,
+                "current_version": str(current_ver),
+                "latest_version": str(latest_ver)
+            }
     
     def _get_update_type(self, current: version.Version, latest: version.Version) -> str:
         """获取更新类型"""
@@ -184,6 +194,7 @@ class UpdateChecker:
         2. 读取缓存文件中的timestamp
         3. 如果读取不到timestamp或超过7天，检查github
         4. 检查github后保存timestamp
+        5. 新增：检查当前版本与缓存中的版本是否一致，如果不一致说明已更新，重新检查
         """
         from .path_utils import (get_readable_resource_path, get_resource_path, 
                            is_frozen, is_nuitka_onefile)
@@ -208,6 +219,18 @@ class UpdateChecker:
             with open(cache_file, 'r', encoding='utf-8') as f:
                 cache_data = json.load(f)
             
+            # 检查版本一致性 - 新增逻辑
+            update_info = cache_data.get('update_info', {})
+            cached_latest_version = update_info.get('latest_version')
+            if cached_latest_version:
+                # 如果当前版本等于缓存中的最新版本，说明已经是最新版本
+                if self.parse_version(self.current_version) >= self.parse_version(cached_latest_version):
+                    signal_bus.log_message.emit("INFO", f"[更新] {env} - 当前版本{self.current_version}已是最新，清除更新标记", {})
+                    # 更新缓存为无更新状态
+                    no_update_result = {"has_update": False, "is_latest": True}
+                    self._save_cache(no_update_result)
+                    return no_update_result
+            
             # 检查缓存时间
             cache_time = datetime.fromisoformat(cache_data.get('timestamp', '2000-01-01'))
             now = datetime.now()
@@ -219,7 +242,7 @@ class UpdateChecker:
             
             # 使用缓存
             signal_bus.log_message.emit("INFO", f"[更新] {env} - 使用缓存数据...", {})
-            return cache_data.get('update_info', {})
+            return update_info
             
         except (json.JSONDecodeError, KeyError, ValueError) as e:
             signal_bus.log_message.emit("ERROR", f"[更新] {env} - 缓存读取失败: {e}，重新检查...", {})
@@ -236,17 +259,24 @@ class UpdateChecker:
         release_data = self.get_latest_release()
         
         if not release_data:
-            # 如果获取失败，返回空结果
-            result = {"has_update": False, "error": "无法获取更新信息"}
+            # 如果获取失败，返回空结果，但仍包含当前版本信息
+            result = {
+                "has_update": False, 
+                "error": "无法获取更新信息",
+                "current_version": self.current_version,
+                "latest_version": self.current_version  # 无法获取最新版本时使用当前版本
+            }
             self._save_cache(result)
             return result
         
         # 比较版本
         version_comparison = self.compare_versions(release_data.get('tag_name', '0.0.0'))
         
-        # 构建完整结果
+        # 构建完整结果，确保始终包含版本信息
         result = {
             **version_comparison,
+            "current_version": self.current_version,
+            "latest_version": release_data.get('tag_name', '0.0.0'),
             "release_info": {
                 "tag_name": release_data.get('tag_name'),
                 "name": release_data.get('name', ''),
