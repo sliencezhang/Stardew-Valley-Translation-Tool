@@ -11,7 +11,8 @@ from typing import Optional
 
 def is_frozen() -> bool:
     """检查是否在打包环境中运行"""
-    return getattr(sys, 'frozen', False) or hasattr(sys, '_MEIPASS')
+    # return getattr(sys, 'frozen', False) or hasattr(sys, '_MEIPASS')
+    return True
 
 def is_nuitka_onefile() -> bool:
     """检查是否在Nuitka单文件模式下运行"""
