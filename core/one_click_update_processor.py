@@ -204,8 +204,10 @@ class OneClickUpdateProcessor:
                 
                 # 直接使用Windows命令删除文件夹
                 try:
-                    # 使用rd命令删除文件夹
-                    result = subprocess.run(['cmd', '/c', 'rd', '/s', '/q', output_folder], 
+                    # 使用rd命令删除文件夹，确保路径格式正确
+                    # 将正斜杠转换为反斜杠，Windows命令更喜欢反斜杠
+                    windows_path = output_folder.replace('/', '\\')
+                    result = subprocess.run(['cmd', '/c', 'rd', '/s', '/q', windows_path], 
                                            capture_output=True, text=True, timeout=10)
                     if result.returncode == 0:
                         signal_bus.log_message.emit("INFO", "已清理output文件夹", {})
