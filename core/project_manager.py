@@ -145,7 +145,7 @@ class ProjectManager(QObject):
                 # 不自动创建文件夹，只记录日志
 
         if missing_folders:
-            signal_bus.log_message("INFO", f"发现 {len(missing_folders)} 个缺失文件夹", {
+            signal_bus.log_message.emit("INFO", f"发现 {len(missing_folders)} 个缺失文件夹", {
                 "missing_folders": missing_folders
             })
 
