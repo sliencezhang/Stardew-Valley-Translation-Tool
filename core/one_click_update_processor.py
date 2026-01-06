@@ -111,8 +111,6 @@ class OneClickUpdateProcessor:
                 en_mod_folder = en_paths[i]
                 zh_mod_folder = zh_paths[i]
                 
-                signal_bus.log_message.emit("INFO", f"检查mod对 {i+1}/{total_pairs}", {})
-                
                 # 查找英文mod的i18n文件夹
                 en_i18n_folder = os.path.join(en_mod_folder, 'i18n')
                 if not os.path.exists(en_i18n_folder):
@@ -510,15 +508,28 @@ class OneClickUpdateProcessor:
                         os.makedirs(os.path.dirname(dest_file), exist_ok=True)
                         shutil.copy2(src_file, dest_file)
         else:
-            # 只有文件的情况：查找zh.json等中文文件
+            # 只有文件的情况：查找所有中文文件
+            # 首先查找标准的zh.json等文件
             chinese_files = ['zh.json', 'chinese.json', 'zh-CN.json']
+            found_zh_file = False
             for file_name in chinese_files:
                 file_path = os.path.join(source_i18n, file_name)
                 if os.path.exists(file_path):
                     # zh.json对应default.json，所以改为mod_name_default.json
                     dest_file = os.path.join(dest_zh_folder, f"{mod_name}_default.json")
                     shutil.copy2(file_path, dest_file)
+                    found_zh_file = True
                     break
+            
+            # 查找其他可能的中文文件（如mod_zh.json等）
+            for file_name in os.listdir(source_i18n):
+                if file_name.endswith('.json') and file_name not in chinese_files:
+                    # 检查是否可能是中文文件（包含zh、chinese等关键词）
+                    if 'zh' in file_name.lower() or 'chinese' in file_name.lower() or 'cn' in file_name.lower():
+                        file_path = os.path.join(source_i18n, file_name)
+                        dest_file = os.path.join(dest_zh_folder, f"{mod_name}_{file_name}")
+                        shutil.copy2(file_path, dest_file)
+                        signal_bus.log_message.emit("DEBUG", f"复制中文文件: {file_name} -> {os.path.basename(dest_file)}", {})
 
     def _extract_manifest_fields(self, manifest_path: str) -> Dict[str, str]:
         """从manifest.json提取需要翻译的字段"""
@@ -634,9 +645,10 @@ class OneClickUpdateProcessor:
             signal_bus.log_message.emit("INFO", "开始质量检查...", {})
             signal_bus.log_message.emit("DEBUG", f"output_folder参数: {output_folder}", {})
             
-            # 获取项目的en和output文件夹路径
+            # 获取项目的en文件夹路径
             en_folder = self.project_manager.get_folder_path('en')
-            output_folder_path = self.project_manager.get_folder_path('output')
+            # 使用传入的output_folder参数，而不是重新获取
+            output_folder_path = output_folder
             
             # 先收集en文件夹中的英文文件（不包括xxx_content.json和xxx_manifest.json）
             merged_en_data = {}
@@ -698,10 +710,11 @@ class OneClickUpdateProcessor:
                         continue
 
             
-            # 收集完英文文件后，清空en文件夹
-            if os.path.exists(en_folder):
-                shutil.rmtree(en_folder)
-            os.makedirs(en_folder, exist_ok=True)
+            # 保留en文件夹内容，不再清空
+            # 注释：用户需要保留en文件夹的内容用于后续查看
+            # if os.path.exists(en_folder):
+            #     shutil.rmtree(en_folder)
+            # os.makedirs(en_folder, exist_ok=True)
             
             # 确保output文件夹存在
             os.makedirs(output_folder_path, exist_ok=True)
@@ -988,6 +1001,15 @@ class OneClickUpdateProcessor:
     
     def _on_quality_check_dialog_closed(self):
         """质量检查对话框关闭时清理引用"""
+        # 总是自动打开output文件夹
+        if hasattr(self, '_quality_check_output_folder') and self._quality_check_output_folder:
+            output_folder = self._quality_check_output_folder
+            signal_bus.log_message.emit("INFO", f"自动打开output文件夹: {output_folder}", {})
+            
+            # 使用项目中已有的file_tool.open_folder方法
+            if not file_tool.open_folder(output_folder):
+                signal_bus.log_message.emit("ERROR", f"打开output文件夹失败", {})
+        
         self._quality_check_dialog = None
         self._current_quality_widget = None
         signal_bus.log_message.emit("DEBUG", "质量检查窗口已关闭，引用已清理", {})
