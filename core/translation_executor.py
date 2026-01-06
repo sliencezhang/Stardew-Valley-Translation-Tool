@@ -237,10 +237,16 @@ class TranslationExecutor:
                     
                     if zh_folder and os.path.exists(zh_folder):
                         rel_path = Path(src_file).relative_to(source_folder)
+                        
+                        # 处理多文件夹模式下的文件名
                         if rel_path.name.lower() == 'default.json':
                             zh_rel_path = rel_path.with_name('zh.json')
+                        elif rel_path.name.endswith('_default.json'):
+                            # 多文件夹模式：{mod_name}_default.json -> {mod_name}_default.json
+                            zh_rel_path = rel_path
                         else:
                             zh_rel_path = rel_path
+                            
                         zh_file_path = Path(zh_folder) / zh_rel_path
                     
                     # 如果有中文文件，进行增量翻译
