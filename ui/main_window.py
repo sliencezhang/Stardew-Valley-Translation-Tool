@@ -275,6 +275,7 @@ class StardewTranslationTool(QMainWindow):
         signal_bus.translation_completed.connect(self._on_translation_completed)
         signal_bus.translation_error.connect(self._on_translation_error)
         signal_bus.batch_translated.connect(self._on_batch_translated)
+        signal_bus.batch_started.connect(self.progress_dialog.start_batch_countdown)
         signal_bus.translationDialogClosed.connect(self._on_translation_dialog_closed)
     def check_api_status(self):
         """检查API密钥状态"""
@@ -590,12 +591,8 @@ class StardewTranslationTool(QMainWindow):
     def update_translation_progress(self, filename, progress, status):
         """更新翻译进度 - 通过 signal_bus 接收"""
         if self.progress_dialog:
-            # 先更新文件进度
+            # 只更新文件进度，总体进度由_update_statistics方法根据实际翻译项数量计算
             self.progress_dialog.update_file_progress(filename, status, progress)
-
-            # 如果提供了数值进度，也更新总体进度
-            if isinstance(progress, (int, float)):
-                self.progress_dialog.update_overall_progress(int(progress))
 
     def run_worker_in_thread(self, task_type, params, operation_name):
         """在工作线程中运行翻译任务"""

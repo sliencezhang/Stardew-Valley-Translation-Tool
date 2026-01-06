@@ -51,6 +51,7 @@ class TranslationExecutor:
             remaining_batches = total_batches - current_batch
             signal_bus.log_message.emit("INFO", "=" * 70, {})
             signal_bus.log_message.emit("INFO", f"翻译批次 {current_batch}/{total_batches}: {len(batch_texts)} 个文本 (剩余{remaining_batches}批次)", {})
+            signal_bus.batch_started.emit(current_batch, total_batches)
             
             try:
                 batch_translations = self.engine.translate_texts(batch_texts)

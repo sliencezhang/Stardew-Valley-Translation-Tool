@@ -12,6 +12,7 @@ class SignalBus(QObject):
     translation_completed = Signal(str, bool, str)  # 翻译完成: 文件名, 是否成功, 消息
     translation_error = Signal(str, str)  # 翻译错误: 文件名, 错误信息
     batch_translated = Signal(int, int)  # 批次翻译完成: 成功数, 总数
+    batch_started = Signal(int, int)  # 批次开始: 当前批次, 总批次数
     # file_tool，project_manager,tab_smart
     log_message = Signal(str, str, dict)   # 级别('信息', '警告', '错误', '成功'), 消息, 详情
     # settings_dialog

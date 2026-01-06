@@ -51,8 +51,17 @@ class TranslationProgressDialog(QDialog):
         self.incremental_count = 0  # 增量翻译计数
         self.failed_count = 0  # 失败计数
         self.pending_details = []  # 待显示的翻译详情队列
-        self.batch_size = 20  # 每批显示的条目数
+        self.batch_size = 100  # 每批显示的条目数
         self.batch_timer = None  # 批量显示定时器
+        
+        # 批次和超时倒数相关
+        self.current_batch = 0  # 当前批次
+        self.total_batches = 0  # 总批次数
+        self.timeout_seconds = 0  # 超时秒数
+        self.timeout_remaining = 0  # 剩余超时秒数
+        self.timeout_timer = QTimer()  # 超时倒数定时器
+        self.timeout_timer.timeout.connect(self.update_timeout_countdown)
+        self.batch_start_time = 0  # 批次开始时间
 
         self.init_ui()
 
@@ -154,6 +163,7 @@ class TranslationProgressDialog(QDialog):
         self.overall_progress.setRange(0, 100)
         overall_layout.addWidget(self.overall_progress)
 
+        # 进度、状态、批次和超时倒数（一行显示）
         progress_layout = QHBoxLayout()
         progress_layout.addWidget(QLabel("进度:"))
         self.progress_percent = QLabel("0%")
@@ -163,9 +173,20 @@ class TranslationProgressDialog(QDialog):
         progress_layout.addWidget(QLabel("状态:"))
         self.status_label = QLabel("等待开始...")
         progress_layout.addWidget(self.status_label)
+        
+        progress_layout.addWidget(QLabel("批次:"))
+        self.current_batch_label = QLabel("-")
+        self.current_batch_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        progress_layout.addWidget(self.current_batch_label)
+        
+        progress_layout.addWidget(QLabel("超时:"))
+        self.timeout_countdown_label = QLabel("-")
+        self.timeout_countdown_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        progress_layout.addWidget(self.timeout_countdown_label)
+        
         progress_layout.addStretch()
-
         overall_layout.addLayout(progress_layout)
+        
         return overall_group
 
     def _create_splitter(self):
@@ -281,6 +302,13 @@ class TranslationProgressDialog(QDialog):
         self.incremental_label.setText("0")
         self.display_count_label.setText("0")
         self.failed_label.setText("0")
+        
+        # 重置批次倒数
+        self.current_batch = 0
+        self.total_batches = 0
+        self.current_batch_label.setText("-")
+        self.timeout_countdown_label.setText("-")
+        self.stop_batch_countdown()
 
         self.elapsed_timer.start(1000)
 
@@ -289,6 +317,7 @@ class TranslationProgressDialog(QDialog):
     def stop_operation(self):
         """停止当前操作"""
         self.elapsed_timer.stop()
+        self.stop_batch_countdown()
         self.status_label.setText("已停止")
         signal_bus.log_message.emit("INFO", "操作已停止", {})
         self.operationStopped.emit()
@@ -627,8 +656,20 @@ class TranslationProgressDialog(QDialog):
         if total_items > 0:
             success_rate = (total_translated / total_items) * 100
             self.success_rate_label.setText(f"{success_rate:.1f}%")
+            
+            # 更新总体进度条（基于实际翻译进度）
+            self.overall_progress.setValue(int(success_rate))
+            self.progress_percent.setText(f"{int(success_rate)}%")
         else:
             self.success_rate_label.setText("0%")
+            self.overall_progress.setValue(0)
+            self.progress_percent.setText("0%")
+            
+        # 更新各项计数标签
+        self.ai_translation_label.setText(str(self.ai_translation_count))
+        self.cache_hit_label.setText(str(self.cache_hit_count))
+        self.incremental_label.setText(str(self.incremental_count))
+        self.failed_label.setText(str(self.failed_count))
 
     def _start_batch_display(self):
         """启动批量显示定时器"""
@@ -720,6 +761,7 @@ class TranslationProgressDialog(QDialog):
             if item_id in self.translation_items:
                 item = self.translation_items[item_id]
                 row = item.get('行号', -1)
+                old_status = item.get('状态')
                 
                 # 如果行号有效且在表格范围内
                 if 0 <= row < self.details_table.rowCount():
@@ -737,16 +779,26 @@ class TranslationProgressDialog(QDialog):
                     self._set_table_item(self.details_table, row, 3, detail['status'], color=self._get_status_color(detail['status']))
                     self._set_table_item(self.details_table, row, 4, time.strftime("%H:%M:%S"))
                     
-                    # 更新文件统计
+                    # 如果状态改变，更新计数
+                    if old_status != detail['status']:
+                        if old_status:
+                            self._update_status_count(old_status, -1)
+                        self._update_status_count(detail['status'], 1)
+                    
+                    # 更新文件统计（缓存命中和增量翻译也需要更新）
                     if detail['status'] in ["完成", "翻译中", "增量翻译", "命中缓存", "成功"] and detail['filename'] in self.file_items and detail['filename'] != "quality_issues":
                         file_info = self.file_items[detail['filename']]
-                        file_info['译文'] = file_info.get('译文', 0) + 1
                         
-                        # 计算进度
-                        if file_info['总数'] > 0:
-                            progress = min(100, int((file_info['译文'] / file_info['总数']) * 100))
-                            file_status = "完成" if progress == 100 else "翻译中"
-                            self.update_file_progress(detail['filename'], file_status, progress, file_info['译文'])
+                        # 只有当状态从非成功状态变为成功状态时才增加计数
+                        success_statuses = ["完成", "翻译中", "增量翻译", "命中缓存", "成功"]
+                        if old_status not in success_statuses and detail['status'] in success_statuses:
+                            file_info['译文'] = file_info.get('译文', 0) + 1
+                            
+                            # 计算进度
+                            if file_info['总数'] > 0:
+                                progress = min(100, int((file_info['译文'] / file_info['总数']) * 100))
+                                file_status = "完成" if progress == 100 else "翻译中"
+                                self.update_file_progress(detail['filename'], file_status, progress, file_info['译文'])
                 return
             else:
                 # 项目不存在，转为新增操作
@@ -764,6 +816,21 @@ class TranslationProgressDialog(QDialog):
                     return
         
         # 新增操作
+        # 更新计数（即使是淘汰的项目也要统计）
+        status = detail.get('status', '等待翻译')
+        self._update_status_count(status, 1)
+        
+        # 更新文件统计（即使是淘汰的项目也要更新）
+        if status in ["完成", "翻译中", "增量翻译", "命中缓存", "成功"] and detail['filename'] in self.file_items and detail['filename'] != "quality_issues":
+            file_info = self.file_items[detail['filename']]
+            file_info['译文'] = file_info.get('译文', 0) + 1
+            
+            # 计算进度
+            if file_info['总数'] > 0:
+                progress = min(100, int((file_info['译文'] / file_info['总数']) * 100))
+                file_status = "完成" if progress == 100 else "翻译中"
+                self.update_file_progress(detail['filename'], file_status, progress, file_info['译文'])
+        
         # 检查是否需要淘汰旧条目
         if self.details_table.rowCount() >= self.max_detail_rows:
             self._remove_old_removable_items()
@@ -942,6 +1009,44 @@ class TranslationProgressDialog(QDialog):
         minutes = (self.elapsed_seconds % 3600) // 60
         seconds = self.elapsed_seconds % 60
         self.elapsed_time_label.setText(f"{hours:02d}:{minutes:02d}:{seconds:02d}")
+    
+    def update_timeout_countdown(self):
+        """更新超时倒数"""
+        if self.timeout_remaining > 0:
+            self.timeout_remaining -= 1
+            minutes = self.timeout_remaining // 60
+            seconds = self.timeout_remaining % 60
+            self.timeout_countdown_label.setText(f"{minutes:02d}:{seconds:02d}")
+        else:
+            self.timeout_countdown_label.setText("已超时")
+            self.timeout_timer.stop()
+    
+    def start_batch_countdown(self, current_batch: int, total_batches: int):
+        """开始批次倒数"""
+        self.current_batch = current_batch
+        self.total_batches = total_batches
+        self.current_batch_label.setText(f"{current_batch}/{total_batches}")
+        
+        # 从配置中获取超时时间
+        from core.config import config
+        self.timeout_seconds = config.api_timeout
+        self.timeout_remaining = self.timeout_seconds
+        self.batch_start_time = time.time()
+        
+        # 重启倒数定时器
+        self.timeout_timer.stop()
+        self.timeout_timer.start(1000)  # 每秒更新一次
+        
+        # 更新显示
+        minutes = self.timeout_remaining // 60
+        seconds = self.timeout_remaining % 60
+        self.timeout_countdown_label.setText(f"{minutes:02d}:{seconds:02d}")
+    
+    def stop_batch_countdown(self):
+        """停止批次倒数"""
+        self.timeout_timer.stop()
+        self.timeout_countdown_label.setText("-")
+        self.current_batch_label.setText("-")
 
     def update_overall_progress(self, progress: int):
         """更新总体进度"""
@@ -953,25 +1058,15 @@ class TranslationProgressDialog(QDialog):
     def operation_completed(self, success: bool = True):
         """操作完成"""
         self.elapsed_timer.stop()
+        self.stop_batch_countdown()
 
         if success:
             self.status_label.setText("完成")
             signal_bus.log_message.emit("SUCCESS","操作完成！",{})
 
-            # 显示最终统计
-            total_items = sum(item['总数'] for item in self.file_items.values())
-            total_translated = sum(item['译文'] for item in self.file_items.values())
-
-            if total_items > 0:
-                success_rate = (total_translated / total_items * 100)
-                stats_msg = (
-                    f"📊 最终统计: 成功 {total_translated}/{total_items} ({success_rate:.1f}%) | "
-                    f"AI翻译: {self.ai_translation_count} | "
-                    f"缓存命中: {self.cache_hit_count} | "
-                    f"增量翻译: {self.incremental_count} | "
-                    f"失败: {self.failed_count}"
-                )
-                signal_bus.log_message.emit("INFO", stats_msg, {})
+            # 延迟发送统计数据，确保UI完全刷新后再发送
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(500, self._send_current_stats_to_log)
         else:
             self.status_label.setText("失败")
             signal_bus.log_message.emit("ERROR", "操作失败！", {})
@@ -987,13 +1082,63 @@ class TranslationProgressDialog(QDialog):
             y = parent_geometry.top() + 20
             self.move(x, y)
 
+    def _send_current_stats_to_log(self):
+        """发送当前显示的统计数据到日志"""
+        # 如果还有待处理的项，等待处理完成
+        if self.pending_details:
+            # 延迟500ms后再检查
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(500, self._send_current_stats_to_log)
+            return
+        
+        # 确保所有统计更新完成
+        self._update_statistics()
+        
+        # 获取当前显示的统计数据
+        total_items = self.total_items_label.text()
+        untranslated_items = self.translated_items_label.text()
+        success_rate = self.success_rate_label.text()
+        ai_count = self.ai_translation_label.text()
+        cache_count = self.cache_hit_label.text()
+        incremental_count = self.incremental_label.text()
+        failed_count = self.failed_label.text()
+        
+        # 计算实际翻译数量
+        try:
+            total = int(total_items) if total_items.isdigit() else 0
+            untranslated = int(untranslated_items) if untranslated_items.isdigit() else 0
+            translated = total - untranslated
+            
+            stats_msg = (
+                f"📊 最终统计: 成功 {translated}/{total} ({success_rate}) | "
+                f"AI翻译: {ai_count} | "
+                f"缓存命中: {cache_count} | "
+                f"增量翻译: {incremental_count} | "
+                f"失败: {failed_count}"
+            )
+            signal_bus.log_message.emit("INFO", stats_msg, {})
+        except (ValueError, AttributeError):
+            # 如果转换失败，发送原始数据
+            stats_msg = (
+                f"📊 统计数据: 总数 {total_items} | 未翻译 {untranslated_items} | "
+                f"成功率 {success_rate} | AI翻译 {ai_count} | "
+                f"缓存命中 {cache_count} | 增量翻译 {incremental_count} | 失败 {failed_count}"
+            )
+            signal_bus.log_message.emit("INFO", stats_msg, {})
+
     def closeEvent(self, event):
         """关闭事件"""
         self.elapsed_timer.stop()
+        self.stop_batch_countdown()
         # 停止批量显示定时器
         if self.batch_timer:
             self.batch_timer.stop()
             self.batch_timer = None
+            
+        # 如果正在操作中，发送当前统计数据
+        if self.status_label.text() == "翻译中...":
+            self._send_current_stats_to_log()
+        
         # 延迟发送信号，确保窗口完全关闭后再触发质量检查
         from PySide6.QtCore import QTimer
         QTimer.singleShot(200, signal_bus.translationDialogClosed.emit)
