@@ -699,7 +699,6 @@ class StardewTranslationTool(QMainWindow):
     
     def _on_translation_dialog_closed(self):
         """翻译进度对话框关闭回调"""
-        signal_bus.log_message.emit("INFO", "_on_translation_dialog_closed被调用", {})
         
         # 检查是否是质量检查的AI重新翻译任务
         # 通过检查当前任务类型来判断
@@ -708,7 +707,6 @@ class StardewTranslationTool(QMainWindow):
             is_quality_retranslation = self.translation_executor._current_task_type == "quality_review"
         
         if is_quality_retranslation:
-            signal_bus.log_message.emit("DEBUG", "检测到是质量检查AI重新翻译，不触发新的质量检查窗口", {})
             # 清除任务类型标记
             if hasattr(self.translation_executor, '_current_task_type'):
                 delattr(self.translation_executor, '_current_task_type')
@@ -716,30 +714,19 @@ class StardewTranslationTool(QMainWindow):
         
         # 使用更长的延迟，确保窗口完全关闭
         from PySide6.QtCore import QTimer
-        QTimer.singleShot(1000, self._delayed_trigger_quality_check)
-        signal_bus.log_message.emit("DEBUG", "已设置延迟触发质量检查", {})
+        QTimer.singleShot(500, self._delayed_trigger_quality_check)
     
     def _delayed_trigger_quality_check(self):
         """延迟触发质量检查"""
-        signal_bus.log_message.emit("DEBUG", "_delayed_trigger_quality_check被调用", {})
         # 检查是否是一键更新任务
         if hasattr(self.translation_executor, '_current_processor'):
-            signal_bus.log_message.emit("DEBUG", "找到current_processor", {})
             # 检查当前处理器是否是一键更新处理器
             current_processor = self.translation_executor._current_processor
             if current_processor and hasattr(current_processor, 'trigger_quality_check'):
-                signal_bus.log_message.emit("DEBUG", "确认是一键更新处理器", {})
                 # 检查进度对话框是否存在（窗口已关闭）
                 if not self.progress_dialog.isVisible():
                     # 只有一键更新任务且窗口已关闭才触发质量检查
-                    signal_bus.log_message.emit("INFO", "延迟触发质量检查...", {})
                     current_processor.trigger_quality_check()
-                else:
-                    signal_bus.log_message.emit("DEBUG", "进度对话框仍然可见", {})
-            else:
-                signal_bus.log_message.emit("DEBUG", "不是一键更新处理器", {})
-        else:
-            signal_bus.log_message.emit("DEBUG", "没有current_processor", {})
 
     def stop_current_operation(self):
         """停止当前操作"""
@@ -1007,6 +994,8 @@ class StardewTranslationTool(QMainWindow):
 
     def start_smart_translation(self, params):
         """开始智能翻译"""
+        # 清理可能残留的current_processor
+        self.translation_executor._current_processor = None
         self.run_worker_in_thread("smart_translation", params, "智能翻译")
 
     def start_one_click_update(self, params):

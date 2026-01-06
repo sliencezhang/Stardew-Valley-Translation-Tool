@@ -437,9 +437,7 @@ class OneClickUpdateProcessor:
                     
                     # 清理临时文件（保留质量检查文件）
                     self._cleanup_temp_files(output_folder_path)
-                    
-                    # 不清理output文件夹，因为质量检查文件可能还在其中
-                    signal_bus.log_message.emit("DEBUG", "跳过清理output文件夹，保留质量检查文件", {})
+
                 else:
                     signal_bus.log_message.emit("ERROR", f"统一翻译失败: {result.get('消息', '未知错误')}", {})
             
@@ -743,11 +741,7 @@ class OneClickUpdateProcessor:
             # 保存到项目文件夹
             en_file = os.path.join(en_folder, '质量检查.json')
             zh_file = os.path.join(output_folder_path, '质量检查.json')
-            
-            # 输出完整路径用于调试
-            signal_bus.log_message.emit("DEBUG", f"英文文件完整路径: {os.path.abspath(en_file)}", {})
-            signal_bus.log_message.emit("DEBUG", f"中文文件完整路径: {os.path.abspath(zh_file)}", {})
-            signal_bus.log_message.emit("DEBUG", f"output文件夹路径: {os.path.abspath(output_folder_path)}", {})
+
             
             # 2. 收集output各个mod文件夹中的中文文件
             if os.path.exists(output_folder_path):
@@ -769,7 +763,6 @@ class OneClickUpdateProcessor:
                     zh_file_path = os.path.join(i18n_path, 'zh.json')
                     signal_bus.log_message.emit("DEBUG", f"检查zh.json是否存在: {zh_file_path}", {})
                     if os.path.exists(zh_file_path):
-                        signal_bus.log_message.emit("INFO", f"找到zh.json文件: {zh_file_path}", {})
                         # 处理zh.json文件
                         try:
                             zh_data = file_tool.read_json_file(zh_file_path)
@@ -843,7 +836,6 @@ class OneClickUpdateProcessor:
             
             # 使用file_tool保存文件，同时保存mod_mapping信息
             try:
-                signal_bus.log_message.emit("DEBUG", f"准备保存英文文件到: {en_file}", {})
                 # 将mod_mapping信息也保存到文件中
                 file_data = {
                     'data': merged_en_data,
@@ -851,17 +843,11 @@ class OneClickUpdateProcessor:
                 }
                 file_tool.save_json_file(file_data, en_file)
                 signal_bus.log_message.emit("INFO", f"保存英文合并文件成功: {en_file}，包含 {len(merged_en_data)} 项", {})
-                # 立即验证
-                if os.path.exists(en_file):
-                    signal_bus.log_message.emit("DEBUG", f"验证英文文件存在", {})
-                else:
-                    signal_bus.log_message.emit("ERROR", f"英文文件保存后不存在!", {})
             except Exception as e:
                 signal_bus.log_message.emit("ERROR", f"保存英文合并文件失败: {str(e)}", {})
                 return
             
             try:
-                signal_bus.log_message.emit("DEBUG", f"准备保存中文文件到: {zh_file}", {})
                 # 将mod_mapping信息也保存到文件中
                 file_data = {
                     'data': merged_zh_data,
@@ -869,15 +855,7 @@ class OneClickUpdateProcessor:
                 }
                 file_tool.save_json_file(file_data, zh_file)
                 signal_bus.log_message.emit("INFO", f"保存中文合并文件成功: {zh_file}，包含 {len(merged_zh_data)} 项", {})
-                
-                # 立即验证文件是否真的存在
-                if os.path.exists(zh_file):
-                    file_size = os.path.getsize(zh_file)
-                    signal_bus.log_message.emit("DEBUG", f"验证中文文件存在，大小: {file_size} 字节", {})
-                else:
-                    signal_bus.log_message.emit("ERROR", f"中文文件保存后不存在: {zh_file}!", {})
-                    return
-                    
+
                 # 列出output文件夹的所有内容
                 try:
                     output_files = os.listdir(output_folder_path)
@@ -902,7 +880,6 @@ class OneClickUpdateProcessor:
     def _show_quality_check_dialog(self, en_file, zh_file, output_folder, mod_mapping):
         """显示独立的质量检查窗口"""
         try:
-            signal_bus.log_message.emit("INFO", "准备显示质量检查窗口", {})
             
             # 将参数保存为实例变量，避免通过信号传递
             self._quality_check_en_file = str(en_file) if en_file else None
@@ -1014,8 +991,7 @@ class OneClickUpdateProcessor:
             
             # 显示非模态对话框
             dialog.show()
-            
-            signal_bus.log_message.emit("SUCCESS", "质量检查窗口已显示", {})
+
             
         except Exception as e:
             signal_bus.log_message.emit("ERROR", f"显示质量检查窗口失败: {str(e)}", {})
@@ -1025,7 +1001,6 @@ class OneClickUpdateProcessor:
         # 总是自动打开output文件夹
         if hasattr(self, '_quality_check_output_folder') and self._quality_check_output_folder:
             output_folder = self._quality_check_output_folder
-            signal_bus.log_message.emit("INFO", f"自动打开output文件夹: {output_folder}", {})
             
             # 使用项目中已有的file_tool.open_folder方法
             if not file_tool.open_folder(output_folder):
@@ -1036,7 +1011,6 @@ class OneClickUpdateProcessor:
         
         self._quality_check_dialog = None
         self._current_quality_widget = None
-        signal_bus.log_message.emit("DEBUG", "质量检查窗口已关闭，引用已清理", {})
     
     def _on_quality_check_completed_wrapper(self, result):
         """质量检查完成的包装方法"""
@@ -1073,8 +1047,7 @@ class OneClickUpdateProcessor:
                 quality_check_file = os.path.join(output_folder_path, "质量检查.json")
                 if os.path.exists(quality_check_file):
                     os.remove(quality_check_file)
-            
-            signal_bus.log_message.emit("INFO", "临时文件清理完成", {})
+
         except Exception as e:
             signal_bus.log_message.emit("ERROR", f"清理临时文件失败: {str(e)}", {})
     
@@ -1145,7 +1118,6 @@ class OneClickUpdateProcessor:
     def trigger_quality_check(self):
         """触发质量检查"""
         try:
-            signal_bus.log_message.emit("INFO", "trigger_quality_check被调用", {})
             
             # 检查是否已有质量检查窗口
             if hasattr(self, '_quality_check_dialog') and self._quality_check_dialog:
@@ -1160,8 +1132,7 @@ class OneClickUpdateProcessor:
                 self._quality_check_output_folder = output_folder
                 # 使用QTimer延迟执行，避免在信号处理过程中直接创建窗口
                 from PySide6.QtCore import QTimer
-                QTimer.singleShot(1000, self._delayed_perform_quality_check)
-                signal_bus.log_message.emit("DEBUG", "已设置延迟执行质量检查", {})
+                QTimer.singleShot(5000, self._delayed_perform_quality_check)
         except Exception as e:
             signal_bus.log_message.emit("ERROR", f"触发质量检查失败: {str(e)}", {})
     
@@ -1246,12 +1217,8 @@ class OneClickUpdateProcessor:
     def _delayed_perform_quality_check(self):
         """延迟执行质量检查"""
         try:
-            signal_bus.log_message.emit("DEBUG", "_delayed_perform_quality_check被调用", {})
             if hasattr(self, '_quality_check_output_folder'):
-                signal_bus.log_message.emit("DEBUG", f"准备调用_perform_quality_check", {})
                 self._perform_quality_check(self._quality_check_output_folder)
-            else:
-                signal_bus.log_message.emit("ERROR", "没有_quality_check_output_folder属性", {})
         except Exception as e:
             signal_bus.log_message.emit("ERROR", f"延迟执行质量检查失败: {str(e)}", {})
     
@@ -1469,13 +1436,11 @@ class OneClickUpdateProcessor:
                 manifest_file = os.path.join(mod_i18n_dir, 'manifest.json')
                 if os.path.exists(manifest_file):
                     os.remove(manifest_file)
-                    signal_bus.log_message.emit("DEBUG", f"清理i18n文件夹中的manifest.json", {})
                 
                 # 删除content.json
                 content_file = os.path.join(mod_i18n_dir, 'content.json')
                 if os.path.exists(content_file):
                     os.remove(content_file)
-                    signal_bus.log_message.emit("DEBUG", f"清理i18n文件夹中的content.json", {})
                 
                 # 检查是否有ZH文件夹，也清理其中的manifest.json和content.json
                 zh_dir = os.path.join(mod_i18n_dir, 'ZH')
