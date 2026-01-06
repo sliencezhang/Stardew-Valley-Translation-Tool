@@ -639,10 +639,8 @@ class NameDetectionResultDialog(QDialog):
                 terminology_manager = TerminologyManager()
                 
                 # 使用当前Python项目的resources目录
-                # 获取当前文件的绝对路径，然后向上两级找到项目根目录
-                current_file_path = os.path.abspath(__file__)
-                project_root = os.path.dirname(os.path.dirname(current_file_path))
-                terminology_path = os.path.join(project_root, "resources", "terminology.json")
+                from core.config import get_resource_path
+                terminology_path = get_resource_path("resources/terminology.json")
                 
                 # 加载现有术语表
                 if os.path.exists(terminology_path):
