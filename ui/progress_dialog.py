@@ -50,6 +50,9 @@ class TranslationProgressDialog(QDialog):
         self.cache_hit_count = 0  # 缓存命中计数
         self.incremental_count = 0  # 增量翻译计数
         self.failed_count = 0  # 失败计数
+        self.pending_details = []  # 待显示的翻译详情队列
+        self.batch_size = 20  # 每批显示的条目数
+        self.batch_timer = None  # 批量显示定时器
 
         self.init_ui()
 
@@ -379,27 +382,47 @@ class TranslationProgressDialog(QDialog):
             '行号': None
         }
 
-        # 获取当前行号
-        row = self.details_table.rowCount()
-        self.translation_items[item_id]['行号'] = row
+        # 添加到待显示队列
+        self.pending_details.append({
+            'filename': filename,
+            'key': key,
+            'original_text': original_text,
+            'item_id': item_id
+        })
 
-        # 添加到表格
-        self.details_table.insertRow(row)
-
-        self._set_table_item(self.details_table, row, 0, self._shorten_text(key, 80), tooltip=key)
-        self._set_table_item(self.details_table, row, 1, self._shorten_text(original_text, 100), tooltip=original_text)
-        self._set_table_item(self.details_table, row, 2, "")
-        self._set_table_item(self.details_table, row, 3, "等待翻译", color=self._get_status_color("等待翻译"))
-        self._set_table_item(self.details_table, row, 4, time.strftime("%H:%M:%S"))
-
-        # 立即刷新界面
-        self._force_refresh_table(self.details_table)
-        self.details_table.scrollToBottom()
+        # 启动批量显示定时器
+        self._start_batch_display()
 
     def update_translation_detail(self, filename: str, key: str,
                                   translated_text: str, status: str = "成功", original_text: str = None):
         """更新翻译详情（智能淘汰版本）"""
         item_id = (filename, key)
+
+        # 如果是增量更新或命中缓存，添加到队列中分批处理
+        if status in ["增量翻译", "命中缓存"]:
+            # 检查是否已在队列中
+            for pending in self.pending_details:
+                if pending['item_id'] == item_id:
+                    # 更新队列中的项目
+                    pending['translated_text'] = translated_text
+                    pending['status'] = status
+                    pending['original_text'] = original_text if original_text is not None else key
+                    return
+            
+            # 添加到队列
+            self.pending_details.append({
+                'filename': filename,
+                'key': key,
+                'original_text': original_text if original_text is not None else key,
+                'translated_text': translated_text,
+                'status': status,
+                'item_id': item_id,
+                'is_update': True  # 标记这是更新操作
+            })
+            
+            # 启动批量显示定时器
+            self._start_batch_display()
+            return
 
         # 如果不存在，直接创建项
         if item_id not in self.translation_items:
@@ -551,21 +574,7 @@ class TranslationProgressDialog(QDialog):
     def _get_status_color(self, status: str) -> QColor:
         """根据状态获取颜色"""
         from core.config import config
-        
-        # 优先匹配特定的等待状态
-        if status == '等待翻译' or status == '等待':
-            if config.theme == "dark":
-                return QColor(158, 158, 158)  # 浅灰色
-            else:
-                return QColor(128, 128, 128)  # 灰色
-        
-        # # 检查是否是动态状态（包含特定关键词）
-        # if 'AI翻译' in status or '翻译' in status:
-        #     if config.theme == "dark":
-        #         return QColor(100, 181, 246)  # 浅蓝色
-        #     else:
-        #         return QColor(0, 0, 255)  # 蓝色
-        
+
         if config.theme == "dark":
             # 深色主题的颜色
             status_colors = {
@@ -620,6 +629,202 @@ class TranslationProgressDialog(QDialog):
             self.success_rate_label.setText(f"{success_rate:.1f}%")
         else:
             self.success_rate_label.setText("0%")
+
+    def _start_batch_display(self):
+        """启动批量显示定时器"""
+        if self.batch_timer is None:
+            from PySide6.QtCore import QTimer
+            self.batch_timer = QTimer()
+            self.batch_timer.timeout.connect(self._process_batch_display)
+            self.batch_timer.start(500)  # 每秒执行一次
+
+    def _process_batch_display(self):
+        """处理批量显示"""
+        if not self.pending_details:
+            # 没有待显示的内容，停止定时器
+            if self.batch_timer:
+                self.batch_timer.stop()
+                self.batch_timer = None
+            return
+
+        # 处理一批内容
+        batch_count = min(self.batch_size, len(self.pending_details))
+        for _ in range(batch_count):
+            if not self.pending_details:
+                break
+            
+            detail = self.pending_details.pop(0)
+            self._display_detail_item(detail)
+
+        # 刷新界面
+        self._force_refresh_table(self.details_table)
+        self.details_table.scrollToBottom()
+    
+    def _replace_table_row(self, row, detail):
+        """替换表格行"""
+        item_id = (detail['filename'], detail['key'])
+        
+        # 更新项目信息
+        if item_id in self.translation_items:
+            self.translation_items[item_id]['行号'] = row
+            self.translation_items[item_id]['状态'] = detail.get('status', '等待翻译')
+            self.translation_items[item_id]['译文'] = detail.get('translated_text', '')
+            self.translation_items[item_id]['时间'] = time.time()
+        
+        # 更新表格项
+        self._set_table_item(self.details_table, row, 0, self._shorten_text(detail['key'], 80), tooltip=detail['key'])
+        self._set_table_item(self.details_table, row, 1, self._shorten_text(detail['original_text'], 100), tooltip=detail['original_text'])
+        self._set_table_item(self.details_table, row, 2, self._shorten_text(detail.get('translated_text', ''), 100), tooltip=detail.get('translated_text', ''))
+        self._set_table_item(self.details_table, row, 3, detail.get('status', '等待翻译'), color=self._get_status_color(detail.get('status', '等待翻译')))
+        self._set_table_item(self.details_table, row, 4, time.strftime("%H:%M:%S"))
+        
+        # 立即刷新界面
+        self._force_refresh_table(self.details_table)
+    
+    def _add_new_table_row(self, detail):
+        """新增表格行（即使超出限制）"""
+        item_id = (detail['filename'], detail['key'])
+        
+        # 获取当前行号
+        row = self.details_table.rowCount()
+        self.details_table.insertRow(row)
+        
+        # 创建或更新项目
+        if item_id not in self.translation_items:
+            self.translation_items[item_id] = {
+                '原文': detail['original_text'],
+                '译文': detail.get('translated_text', ''),
+                '状态': detail.get('status', '等待翻译'),
+                '行号': row,
+                '时间': time.time()
+            }
+        
+        # 设置表格项
+        self._set_table_item(self.details_table, row, 0, self._shorten_text(detail['key'], 80), tooltip=detail['key'])
+        self._set_table_item(self.details_table, row, 1, self._shorten_text(detail['original_text'], 100), tooltip=detail['original_text'])
+        self._set_table_item(self.details_table, row, 2, self._shorten_text(detail.get('translated_text', ''), 100), tooltip=detail.get('translated_text', ''))
+        self._set_table_item(self.details_table, row, 3, detail.get('status', '等待翻译'), color=self._get_status_color(detail.get('status', '等待翻译')))
+        self._set_table_item(self.details_table, row, 4, time.strftime("%H:%M:%S"))
+        
+        # 立即刷新界面
+        self._force_refresh_table(self.details_table)
+        self.details_table.scrollToBottom()
+
+    def _display_detail_item(self, detail):
+        """显示单个详情项"""
+        item_id = detail['item_id']
+        
+        # 如果是更新操作
+        if detail.get('is_update', False):
+            # 检查项目是否已存在
+            if item_id in self.translation_items:
+                item = self.translation_items[item_id]
+                row = item.get('行号', -1)
+                
+                # 如果行号有效且在表格范围内
+                if 0 <= row < self.details_table.rowCount():
+                    # 恢复变量保护标记后的译文用于显示
+                    display_translated = self._restore_variables_in_text(detail['translated_text'])
+                    
+                    # 更新数据
+                    item['译文'] = detail['translated_text']
+                    item['显示译文'] = display_translated
+                    item['状态'] = detail['status']
+                    item['时间'] = time.time()
+                    
+                    # 更新表格项
+                    self._set_table_item(self.details_table, row, 2, self._shorten_text(display_translated, 100), tooltip=display_translated)
+                    self._set_table_item(self.details_table, row, 3, detail['status'], color=self._get_status_color(detail['status']))
+                    self._set_table_item(self.details_table, row, 4, time.strftime("%H:%M:%S"))
+                    
+                    # 更新文件统计
+                    if detail['status'] in ["完成", "翻译中", "增量翻译", "命中缓存", "成功"] and detail['filename'] in self.file_items and detail['filename'] != "quality_issues":
+                        file_info = self.file_items[detail['filename']]
+                        file_info['译文'] = file_info.get('译文', 0) + 1
+                        
+                        # 计算进度
+                        if file_info['总数'] > 0:
+                            progress = min(100, int((file_info['译文'] / file_info['总数']) * 100))
+                            file_status = "完成" if progress == 100 else "翻译中"
+                            self.update_file_progress(detail['filename'], file_status, progress, file_info['译文'])
+                return
+            else:
+                # 项目不存在，转为新增操作
+                # 注意：这里需要检查是否应该添加该项目
+                # 如果是增量更新或命中缓存，且表格已满，则跳过
+                if detail.get('status') in ["增量翻译", "命中缓存"] and self.details_table.rowCount() >= self.max_detail_rows:
+                    # 不添加，直接在内存中记录
+                    self.translation_items[item_id] = {
+                        '原文': detail['original_text'],
+                        '译文': detail.get('translated_text', ''),
+                        '状态': detail.get('status', '等待翻译'),
+                        '行号': -1,  # 标记为不显示
+                        '时间': time.time()
+                    }
+                    return
+        
+        # 新增操作
+        # 检查是否需要淘汰旧条目
+        if self.details_table.rowCount() >= self.max_detail_rows:
+            self._remove_old_removable_items()
+        
+        # 如果淘汰后还是满了，根据状态决定是否添加
+        if self.details_table.rowCount() >= self.max_detail_rows:
+            # 如果是等待翻译，强制显示（替换最早的非等待翻译项）
+            if detail.get('status') == '等待翻译':
+                # 找到最早的可替换项并替换（只替换增量翻译和命中缓存）
+                for row in range(self.details_table.rowCount()):
+                    item = self.details_table.item(row, 3)
+                    if item and item.text() in ['增量翻译', '命中缓存']:
+                        # 替换这一行
+                        self._replace_table_row(row, detail)
+                        return
+                # 如果没找到可替换的，直接在末尾添加
+                self._add_new_table_row(detail)
+                return
+            else:
+                # 增量更新和命中缓存不显示
+                self.translation_items[item_id] = {
+                    '原文': detail['original_text'],
+                    '译文': detail.get('translated_text', ''),
+                    '状态': detail.get('status', '等待翻译'),
+                    '行号': -1,  # 标记为不显示
+                    '时间': time.time()
+                }
+                return
+            
+        # 获取当前行号
+        row = self.details_table.rowCount()
+        
+        # 创建或更新项目
+        if item_id not in self.translation_items:
+            self.translation_items[item_id] = {
+                '原文': detail['original_text'],
+                '译文': detail.get('translated_text', ''),
+                '状态': detail.get('status', '等待翻译'),
+                '行号': row,
+                '时间': time.time()
+            }
+        else:
+            self.translation_items[item_id]['行号'] = row
+
+        # 添加到表格
+        self.details_table.insertRow(row)
+
+        self._set_table_item(self.details_table, row, 0, self._shorten_text(detail['key'], 80), tooltip=detail['key'])
+        self._set_table_item(self.details_table, row, 1, self._shorten_text(detail['original_text'], 100), tooltip=detail['original_text'])
+        
+        # 如果有译文，显示译文，否则为空
+        if detail.get('translated_text'):
+            display_translated = self._restore_variables_in_text(detail['translated_text'])
+            self._set_table_item(self.details_table, row, 2, self._shorten_text(display_translated, 100), tooltip=display_translated)
+            status = detail.get('status', '等待翻译')
+        else:
+            self._set_table_item(self.details_table, row, 2, "")
+            status = '等待翻译'
+            
+        self._set_table_item(self.details_table, row, 3, status, color=self._get_status_color(status))
+        self._set_table_item(self.details_table, row, 4, time.strftime("%H:%M:%S"))
 
     def _restore_variables_in_text(self, text: str) -> str:
         """恢复文本中的变量保护标记"""
@@ -715,18 +920,20 @@ class TranslationProgressDialog(QDialog):
 
     def _update_status_count(self, status: str, delta: int):
         """更新状态计数"""
-        if status == "成功" or status == "失败":
+        if status == "成功":
             self.ai_translation_count += delta
             self.ai_translation_label.setText(str(self.ai_translation_count))
+        elif status == "失败":
+            self.ai_translation_count += delta
+            self.ai_translation_label.setText(str(self.ai_translation_count))
+            self.failed_count += delta
+            self.failed_label.setText(str(self.failed_count))
         elif status == "命中缓存":
             self.cache_hit_count += delta
             self.cache_hit_label.setText(str(self.cache_hit_count))
         elif status == "增量翻译":
             self.incremental_count += delta
             self.incremental_label.setText(str(self.incremental_count))
-        elif status == "失败":
-            self.failed_count += delta
-            self.failed_label.setText(str(self.failed_count))
 
     def update_elapsed_time(self):
         """更新已用时间"""
@@ -783,6 +990,10 @@ class TranslationProgressDialog(QDialog):
     def closeEvent(self, event):
         """关闭事件"""
         self.elapsed_timer.stop()
+        # 停止批量显示定时器
+        if self.batch_timer:
+            self.batch_timer.stop()
+            self.batch_timer = None
         # 延迟发送信号，确保窗口完全关闭后再触发质量检查
         from PySide6.QtCore import QTimer
         QTimer.singleShot(200, signal_bus.translationDialogClosed.emit)
