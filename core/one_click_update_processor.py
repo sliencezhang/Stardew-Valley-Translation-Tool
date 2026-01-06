@@ -1068,6 +1068,12 @@ class OneClickUpdateProcessor:
                 except Exception as e:
                     signal_bus.log_message.emit("WARNING", f"清理文件失败: {temp_file}, 错误: {str(e)}", {})
             
+            # 清理质量检查.json文件（如果需要）
+            if cleanup_quality_check:
+                quality_check_file = os.path.join(output_folder_path, "质量检查.json")
+                if os.path.exists(quality_check_file):
+                    os.remove(quality_check_file)
+            
             signal_bus.log_message.emit("INFO", "临时文件清理完成", {})
         except Exception as e:
             signal_bus.log_message.emit("ERROR", f"清理临时文件失败: {str(e)}", {})
