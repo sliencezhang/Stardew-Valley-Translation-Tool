@@ -128,7 +128,7 @@ class TranslationProgressDialog(QDialog):
         time_stats_layout.addStretch()
 
         # 右侧：统计信息
-        stats_labels = ["总键值对:", "已翻译:", "成功率:"]
+        stats_labels = ["总键值对:", "未翻译:", "成功率:"]
         stats_widgets = ["total_items_label", "translated_items_label", "success_rate_label"]
 
         for label_text, widget_name in zip(stats_labels, stats_widgets):
@@ -312,7 +312,7 @@ class TranslationProgressDialog(QDialog):
 
         # 设置表格项
         self._set_table_item(self.files_table, row, 0, filename)
-        self._set_table_item(self.files_table, row, 1, "等待", color=QColor(128, 128, 128))
+        self._set_table_item(self.files_table, row, 1, "等待", color=self._get_status_color("等待"))
         self._set_table_item(self.files_table, row, 2, "0%")
         self._set_table_item(self.files_table, row, 3, time.strftime("%H:%M:%S"))
 
@@ -389,7 +389,7 @@ class TranslationProgressDialog(QDialog):
         self._set_table_item(self.details_table, row, 0, self._shorten_text(key, 80), tooltip=key)
         self._set_table_item(self.details_table, row, 1, self._shorten_text(original_text, 100), tooltip=original_text)
         self._set_table_item(self.details_table, row, 2, "")
-        self._set_table_item(self.details_table, row, 3, "等待翻译", color=QColor(128, 128, 128))  # 灰色
+        self._set_table_item(self.details_table, row, 3, "等待翻译", color=self._get_status_color("等待翻译"))
         self._set_table_item(self.details_table, row, 4, time.strftime("%H:%M:%S"))
 
         # 立即刷新界面
@@ -552,12 +552,19 @@ class TranslationProgressDialog(QDialog):
         """根据状态获取颜色"""
         from core.config import config
         
-        # 检查是否是动态状态（包含特定关键词）
-        if 'AI翻译' in status or '翻译' in status:
+        # 优先匹配特定的等待状态
+        if status == '等待翻译' or status == '等待':
             if config.theme == "dark":
-                return QColor(100, 181, 246)  # 浅蓝色
+                return QColor(158, 158, 158)  # 浅灰色
             else:
-                return QColor(0, 0, 255)  # 蓝色
+                return QColor(128, 128, 128)  # 灰色
+        
+        # # 检查是否是动态状态（包含特定关键词）
+        # if 'AI翻译' in status or '翻译' in status:
+        #     if config.theme == "dark":
+        #         return QColor(100, 181, 246)  # 浅蓝色
+        #     else:
+        #         return QColor(0, 0, 255)  # 蓝色
         
         if config.theme == "dark":
             # 深色主题的颜色
@@ -599,9 +606,11 @@ class TranslationProgressDialog(QDialog):
         """更新统计信息"""
         total_translated = sum(item['译文'] for item in self.file_items.values())
         total_items = sum(item['总数'] for item in self.file_items.values())
+        # 计算未翻译数量
+        total_untranslated = total_items - total_translated
 
         self.total_items_label.setText(str(total_items))
-        self.translated_items_label.setText(str(total_translated))
+        self.translated_items_label.setText(str(total_untranslated))  # 显示未翻译数量
         
         # 更新显示条目数
         self.display_count_label.setText(f"{self.details_table.rowCount()}/{self.max_detail_rows}")
