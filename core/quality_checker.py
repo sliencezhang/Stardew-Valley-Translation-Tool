@@ -19,7 +19,7 @@ class QualityChecker:
         self.enable_english_check = True
 
         # 英文检测排除词
-        self.excluded_words = {'joja', 'true', 'false', 'null', 'stardew', 'valley', 'id'}
+        self.excluded_words = {'joja', 'true', 'false', 'null', 'stardew', 'valley', 'id', 'npc'}
         self._excluded_pattern = '|'.join(re.escape(word) for word in self.excluded_words)
         
         # 初始化变量保护器
