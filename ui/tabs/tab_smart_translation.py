@@ -1,4 +1,5 @@
 # ui/tabs/tab_smart_translation.py
+import os
 from pathlib import Path
 import shutil
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QListWidget, QGroupBox)
@@ -124,8 +125,11 @@ class TabSmartTranslation(QWidget):
         open_btn = QPushButton("打开文件夹")
         # open_btn.setStyleSheet(get_blue_button_style())
         open_btn.clicked.connect(open_callback)
+        clean_btn = QPushButton("清理文件夹")
+        clean_btn.clicked.connect(lambda: self.clean_folder(folder_type))
         btn_layout.addWidget(refresh_btn)
         btn_layout.addWidget(open_btn)
+        btn_layout.addWidget(clean_btn)
         # btn_layout.addStretch()
         layout.addLayout(btn_layout)
 
@@ -257,5 +261,34 @@ class TabSmartTranslation(QWidget):
         }
 
         signal_bus.startSmartTranslation.emit(params)
+
+    def clean_folder(self, folder_type: str):
+        """清理文件夹"""
+        if not self.project_manager or not self.project_manager.current_project:
+            return
+        
+        folder_name = "EN" if folder_type == 'en' else "ZH"
+        try:
+            folder_path = self.project_manager.get_folder_path(folder_type)
+            if os.path.exists(folder_path):
+                # 删除文件夹中的所有文件
+                for item in os.listdir(folder_path):
+                    item_path = os.path.join(folder_path, item)
+                    if os.path.isfile(item_path):
+                        os.remove(item_path)
+                    elif os.path.isdir(item_path):
+                        shutil.rmtree(item_path)
+                
+                # 刷新文件列表显示
+                if folder_type == 'en':
+                    self.refresh_en_files()
+                else:
+                    self.refresh_zh_files()
+                
+                signal_bus.log_message.emit("SUCCESS", f"{folder_name}文件夹已清理", {})
+            else:
+                signal_bus.log_message.emit("INFO", f"{folder_name}文件夹不存在", {})
+        except Exception as e:
+            signal_bus.log_message.emit("ERROR", f"清理{folder_name}文件夹失败: {str(e)}", {})
 
     
