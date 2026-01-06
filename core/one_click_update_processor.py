@@ -219,8 +219,12 @@ class OneClickUpdateProcessor:
             # 收集所有要翻译的文件到项目文件夹
             signal_bus.log_message.emit("INFO", "收集所有mod文件夹中的翻译文件...", {})
             
-            # 按顺序收集每个mod文件夹的文件
-            for i, (en_path, zh_path) in enumerate(zip(en_paths, zh_paths)):
+            # 根据文件夹名称匹配英文和中文mod
+            en_mod_map = {Path(p).name: p for p in en_paths}
+            zh_mod_map = {Path(p).name: p for p in zh_paths}
+            
+            # 收集每个英文mod的文件
+            for i, en_path in enumerate(en_paths):
                 mod_name = Path(en_path).name
                 signal_bus.log_message.emit("INFO", f"收集mod {i+1}/{len(en_paths)}: {mod_name} 的翻译文件", {})
                 signal_bus.log_message.emit("DEBUG", f"mod_name实际值: '{mod_name}'", {})
@@ -232,28 +236,39 @@ class OneClickUpdateProcessor:
                     mod_name
                 )
                 
-                # 收集中文文件
-                if os.path.exists(os.path.join(zh_path, 'i18n')):
+                # 查找对应的中文mod（根据文件夹名称）
+                zh_path = zh_mod_map.get(mod_name)
+                if zh_path and os.path.exists(os.path.join(zh_path, 'i18n')):
+                    signal_bus.log_message.emit("DEBUG", f"找到对应的中文mod: {zh_path}", {})
                     self._collect_chinese_files(
                         os.path.join(zh_path, 'i18n'),
                         zh_folder,
                         mod_name
                     )
+                else:
+                    signal_bus.log_message.emit("WARNING", f"未找到对应的中文mod: {mod_name}", {})
             
             # 先收集所有需要翻译的内容
             all_translation_data = {}
             manifest_data = {}
             config_data = {}
             
-            # 处理每个mod文件夹，收集翻译内容
-            for i, (en_path, zh_path) in enumerate(zip(en_paths, zh_paths)):
+            # 处理每个英文mod文件夹，收集翻译内容
+            for i, en_path in enumerate(en_paths):
                 if not self._is_running:
                     break
                     
                 mod_name = Path(en_path).name
                 signal_bus.log_message.emit("INFO", f"收集mod {i+1}/{len(en_paths)}: {mod_name} 的翻译内容", {})
                 signal_bus.log_message.emit("DEBUG", f"en_path: {en_path}", {})
-                signal_bus.log_message.emit("DEBUG", f"zh_path: {zh_path}", {})
+                
+                # 查找对应的中文mod（根据文件夹名称）
+                zh_path = zh_mod_map.get(mod_name)
+                if zh_path:
+                    signal_bus.log_message.emit("DEBUG", f"找到对应的中文mod: {zh_path}", {})
+                else:
+                    signal_bus.log_message.emit("WARNING", f"未找到对应的中文mod: {mod_name}", {})
+                    zh_path = None  # 设置为None，后续代码会处理
                 
                 # 1. 收集i18n文件（已在前面完成）
                 
@@ -365,13 +380,19 @@ class OneClickUpdateProcessor:
                     signal_bus.log_message.emit("INFO", f"总共收集到 {len(translated_data)} 项翻译结果", {})
                     
                     
-                    # 处理每个mod文件夹的输出
-                    for i, (en_path, zh_path) in enumerate(zip(en_paths, zh_paths)):
+                    # 处理每个英文mod文件夹的输出
+                    for i, en_path in enumerate(en_paths):
                         if not self._is_running:
                             break
                             
                         mod_name = Path(en_path).name
                         signal_bus.log_message.emit("INFO", f"处理mod {i+1}/{len(en_paths)}: {mod_name} 的输出", {})
+                        
+                        # 查找对应的中文mod（根据文件夹名称）
+                        zh_path = zh_mod_map.get(mod_name)
+                        if not zh_path:
+                            signal_bus.log_message.emit("WARNING", f"处理输出时未找到对应的中文mod: {mod_name}", {})
+                            zh_path = None  # 设置为None，后续代码会处理
                         
                         # 创建该mod在项目output文件夹中的目录
                         mod_output_dir = os.path.join(output_folder_path, mod_name)
@@ -1009,6 +1030,9 @@ class OneClickUpdateProcessor:
             # 使用项目中已有的file_tool.open_folder方法
             if not file_tool.open_folder(output_folder):
                 signal_bus.log_message.emit("ERROR", f"打开output文件夹失败", {})
+            
+            # 清理所有临时文件，包括质量检查文件
+            self._cleanup_temp_files(output_folder, cleanup_quality_check=True)
         
         self._quality_check_dialog = None
         self._current_quality_widget = None
@@ -1019,18 +1043,19 @@ class OneClickUpdateProcessor:
         if hasattr(self, '_quality_check_output_folder') and hasattr(self, '_quality_check_mod_mapping'):
             self._on_quality_check_completed(result, self._quality_check_output_folder, self._quality_check_mod_mapping)
     
-    def _cleanup_temp_files(self, output_folder_path):
+    def _cleanup_temp_files(self, output_folder_path, cleanup_quality_check=False):
         """清理临时文件"""
         try:
             import glob
-            # 清理所有带下划线的json文件（除了质量检查.json）
+            # 清理所有带下划线的json文件
             temp_files = glob.glob(os.path.join(output_folder_path, "*_*.json"))
             for temp_file in temp_files:
                 try:
-                    # 跳过质量检查文件
-                    if os.path.basename(temp_file) != "质量检查.json":
-                        os.remove(temp_file)
-                        signal_bus.log_message.emit("DEBUG", f"清理临时文件: {os.path.basename(temp_file)}", {})
+                    # 根据参数决定是否跳过质量检查文件
+                    if not cleanup_quality_check and os.path.basename(temp_file) == "质量检查.json":
+                        continue
+                    os.remove(temp_file)
+                    signal_bus.log_message.emit("DEBUG", f"清理临时文件: {os.path.basename(temp_file)}", {})
                 except Exception as e:
                     signal_bus.log_message.emit("WARNING", f"清理文件失败: {temp_file}, 错误: {str(e)}", {})
             
