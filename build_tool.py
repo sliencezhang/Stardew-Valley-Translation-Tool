@@ -94,6 +94,22 @@ def build():
         print("打包完成!")
         print("=" * 60)
         print(f"可执行文件位于: {project_root / 'dist' / output_filename}")
+        
+        # 复制 resources 文件夹到 dist 目录
+        resources_src = project_root / "resources"
+        resources_dst = dist_dir / "resources"
+        if resources_src.exists():
+            print("=" * 60)
+            print("正在复制 resources 文件夹...")
+            try:
+                if resources_dst.exists():
+                    shutil.rmtree(resources_dst)
+                shutil.copytree(resources_src, resources_dst)
+                print(f"resources 文件夹已复制到: {resources_dst}")
+            except Exception as e:
+                print(f"复制 resources 文件夹时出错: {e}")
+            print("=" * 60)
+        
         print("=" * 60)
 
         return result.returncode

@@ -29,7 +29,8 @@ def load_background_image(theme="light"):
         else:
             image_name = "background-night.png"
         
-        image_path = Path(__file__).parent.parent / "resources" / "img" / image_name
+        from core.config import get_resource_path
+        image_path = get_resource_path(f"resources/img/{image_name}")
         
         if image_path.exists():
             return QPixmap(str(image_path))

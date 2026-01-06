@@ -45,7 +45,8 @@ class GlobalSettingsDialog(QDialog):
         self.temperature_spin = None
         self.batch_size_spin = None
         self.api_timeout_spin = None
-        self.terminology_file = (Path(__file__).parent / "../resources/terminology.json").resolve()
+        from core.config import get_resource_path
+        self.terminology_file = get_resource_path("resources/terminology.json")
         
         # 背景图片初始化
         self.background_pixmap = None
@@ -838,7 +839,8 @@ class GlobalSettingsDialog(QDialog):
     def _load_default_prompt(self, silent: bool = False):
         """加载默认提示词"""
         try:
-            prompt_file = (Path(__file__).parent / "../resources/default_prompts.json").resolve()
+            from core.config import get_resource_path
+            prompt_file = get_resource_path("resources/default_prompts.json")
             prompt_data = file_tool.read_json_file(str(prompt_file))
             default_prompt = prompt_data.get("translation_prompt", "")
             self.prompt_edit.setPlainText(default_prompt)

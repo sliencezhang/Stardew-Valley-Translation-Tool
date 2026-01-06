@@ -1,10 +1,5 @@
 # main.py
 import sys
-from pathlib import Path
-# 添加项目根目录到Python路径
-current_dir = Path(__file__).parent
-if str(current_dir) not in sys.path:
-    sys.path.insert(0, str(current_dir))
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QFont, QIcon
@@ -26,7 +21,8 @@ def setup_application():
     app.setFont(font)
 
     # 设置应用程序图标
-    icon_path = current_dir / "resources" / "icons" / "logo.ico"
+    from core.config import get_resource_path
+    icon_path = get_resource_path("resources/icons/logo.ico")
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
     # ============ 图标设置结束 ============

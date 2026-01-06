@@ -114,10 +114,8 @@ class TranslationEngine(QObject):
     def _load_default_terminology(self):
         """加载默认术语表"""
         try:
-            from pathlib import Path
-            current_dir = Path(__file__).parent
-            terminology_file = current_dir / "../resources/terminology.json"
-            terminology_file = terminology_file.resolve()
+            from .config import get_resource_path
+            terminology_file = get_resource_path("resources/terminology.json")
             
             if terminology_file.exists():
                 signal_bus.log_message.emit("INFO", f"[术语表] 从文件加载默认术语: {terminology_file}", {})

@@ -6,7 +6,11 @@ from pathlib import Path
 from PySide6.QtGui import QIcon, QColor
 
 # 图标资源路径
-ICON_PATH = Path(__file__).parent.parent / "resources" / "icons"
+def get_icon_path():
+    from core.config import get_resource_path
+    return get_resource_path("resources/icons")
+
+ICON_PATH = get_icon_path()
 
 
 # ============================================
