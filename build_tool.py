@@ -64,7 +64,7 @@ def build():
         "--enable-plugin=pyside6",  # 启用 PySide6 插件
         f"--windows-icon-from-ico={icon_file}",  # 设置图标
         "--lto=yes",  # 启用链接时优化(压缩)
-        "--include-data-dir=resources=resources",  # 包含整个resources文件夹
+        # "--include-data-dir=resources=resources",  # 不包含resources文件夹
         "--output-dir=dist",  # 输出目录
         f"--output-filename={output_filename}",  # 输出文件名
         "--company-name=Silence",
