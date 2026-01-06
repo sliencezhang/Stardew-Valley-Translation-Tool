@@ -158,23 +158,32 @@ class TranslationExecutor:
             return {'成功': False, '消息': f'未知任务类型: {task_type}'}
         
         # 显式调用以避免类型检查警告
+        result = None
         if task_type == "smart_translation":
-            return self._execute_smart_translation(params)
+            result = self._execute_smart_translation(params)
         elif task_type == "quality_review":
-            return self._execute_quality_review(params)
+            result = self._execute_quality_review(params)
         elif task_type == "manifest":
-            return self._execute_manifest_translation(params)
+            result = self._execute_manifest_translation(params)
         elif task_type == "manifest_incremental":
-            return self._execute_manifest_incremental_translation(params)
+            result = self._execute_manifest_incremental_translation(params)
         elif task_type == "config_menu":
-            return self._execute_config_menu_translation(params)
+            result = self._execute_config_menu_translation(params)
         elif task_type == "one_click_update":
-            return self._execute_one_click_update(params)
+            result = self._execute_one_click_update(params)
         else:
             return {'成功': False, '消息': f'未知任务类型: {task_type}'}
+        
+        # 如果不是一键更新任务，清理current_processor
+        if task_type != "one_click_update":
+            self._current_processor = None
+        
+        return result
     
     def _execute_smart_translation(self, params: Dict) -> Dict[str, Any]:
         """执行智能翻译（整个文件夹）"""
+        signal_bus.log_message.emit("DEBUG", "开始执行智能翻译任务", {})
+        # 不清理current_processor，因为可能是一键更新的一部分
         try:
             source_folder = params.get('原始文件夹', '')
             output_folder = params.get('输出文件夹', '')
@@ -829,12 +838,14 @@ class TranslationExecutor:
     
     def _execute_one_click_update(self, params: Dict) -> Dict[str, Any]:
         """执行一键更新任务"""
+        signal_bus.log_message.emit("DEBUG", "开始执行一键更新任务", {})
         try:
             from core.one_click_update_processor import OneClickUpdateProcessor
             
             processor = OneClickUpdateProcessor(self.project_manager)
             # 保存处理器引用以便主线程访问
             self._current_processor = processor
+            signal_bus.log_message.emit("DEBUG", "已设置current_processor", {})
             result = processor.process(params)
             # 不立即清理引用，让质量检查完成后再清理
             return result
