@@ -809,7 +809,11 @@ class CustomTitleBar(QWidget):
     def close_window(self):
         """关闭窗口"""
         if self.parent_window:
-            self.parent_window.close()
+            # 对于QDialog，使用accept或reject会触发finished信号
+            if hasattr(self.parent_window, 'accept'):
+                self.parent_window.accept()
+            else:
+                self.parent_window.close()
     
     def mousePressEvent(self, event: QMouseEvent):
         """鼠标按下事件 - 记录拖动起始位置"""
