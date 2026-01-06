@@ -44,17 +44,8 @@ class ProjectManager(QObject):
                 base_path = Path(base_path)
             else:
                 # 使用路径工具模块获取正确的应用目录
-                try:
-                    from core.path_utils import get_application_directory
-                    base_path = get_application_directory()
-                except ImportError:
-                    # 如果路径工具不可用，使用回退方案
-                    if getattr(sys, 'frozen', False) or hasattr(sys, '_MEIPASS'):
-                        # 打包环境
-                        base_path = Path(sys.executable).parent
-                    else:
-                        # 开发环境
-                        base_path = Path.cwd()
+                from core.config import get_resource_path
+                base_path = get_resource_path(".")
 
             project_path = base_path / project_name
 

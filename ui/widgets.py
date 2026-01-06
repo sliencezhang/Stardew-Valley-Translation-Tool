@@ -147,20 +147,11 @@ class ProjectDialog(QDialog):
         path_layout = QHBoxLayout()
         path_layout.addWidget(QLabel("项目路径:"))
         self.path_edit = QLineEdit()
-        # 设置默认路径为软件所在目录
-        from pathlib import Path
-        
-        try:
-            # 使用统一的路径工具模块
-            from core.path_utils import get_application_directory
-            default_path = get_application_directory()
-        except ImportError:
-            # 如果路径工具不可用，使用回退方案
-            import sys
-            if getattr(sys, 'frozen', False):
-                default_path = Path(sys.executable).parent
-            else:
-                default_path = Path(__file__).parent.parent
+
+        # 使用统一的路径工具模块
+        from core.config import get_resource_path
+        default_path = get_resource_path(".")
+
         
         self.path_edit.setText(str(default_path))
         self.path_edit.setPlaceholderText("选择项目保存位置...")

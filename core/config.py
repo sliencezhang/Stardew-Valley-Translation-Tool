@@ -1,8 +1,17 @@
 # core/config.py
 from typing import Dict
 import sys
+from pathlib import Path
 from core.signal_bus import signal_bus
 from version import VERSION
+
+
+def get_resource_path(relative_path):
+    """获取资源文件的绝对路径，支持开发环境和打包后的环境"""
+    base_path = Path(sys.argv[0]).parent
+    return base_path / relative_path
+
+
 
 
 class Config:
@@ -80,6 +89,7 @@ class Config:
         # 其他配置
         self.default_batch_size = 20
         self.max_retries = 2
+        self.api_timeout = 120  # API请求超时时间（秒）
         self.temperature = 0.3
         self.theme = "light"
         self.use_background = True
@@ -142,6 +152,7 @@ class Config:
             # 加载其他配置
             self.default_batch_size = int(settings.value("batch_size", self.default_batch_size))
             self.max_retries = int(settings.value("max_retries", self.max_retries))
+            self.api_timeout = int(settings.value("api_timeout", self.api_timeout))
             self.temperature = float(settings.value("temperature", self.temperature))
             self.theme = settings.value("theme", self.theme)
             self.use_background = settings.value("use_background", self.use_background, type=bool)
@@ -193,6 +204,7 @@ class Config:
             # 保存其他配置
             settings.setValue("batch_size", self.default_batch_size)
             settings.setValue("max_retries", self.max_retries)
+            settings.setValue("api_timeout", self.api_timeout)
             settings.setValue("temperature", self.temperature)
             settings.setValue("theme", self.theme)
             settings.setValue("use_background", self.use_background)
@@ -225,6 +237,7 @@ class Config:
                 "default_model": self.default_model,  # 兼容旧配置
                 "default_batch_size": self.default_batch_size,
                 "max_retries": self.max_retries,
+                "api_timeout": self.api_timeout,
                 "temperature": self.temperature,
                 "theme": self.theme,
                 "use_background": self.use_background,
@@ -283,6 +296,7 @@ class Config:
             
             self.default_batch_size = config_data.get("default_batch_size", 20)
             self.max_retries = config_data.get("max_retries", 3)
+            self.api_timeout = config_data.get("api_timeout", 120)
             self.temperature = config_data.get("temperature", 0.3)
             self.theme = config_data.get("theme", "light")
             self.use_background = config_data.get("use_background", True)

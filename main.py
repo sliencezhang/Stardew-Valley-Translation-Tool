@@ -57,20 +57,14 @@ def show_splash_info():
 def initialize_user_directories():
     """初始化用户目录结构"""
     try:
-        from core.path_utils import get_user_data_directory, is_frozen, is_nuitka_onefile
+        from core.config import get_resource_path
         
-        # 只在打包环境中初始化用户目录
-        if is_frozen() or is_nuitka_onefile():
-            user_dir = get_user_data_directory()
-            resources_dir = user_dir / "resources"
+        # 初始化resources目录
+        resources_dir = get_resource_path("resources")
+        resources_dir.mkdir(parents=True, exist_ok=True)
             
-            # 创建用户目录和resources子目录
-            user_dir.mkdir(parents=True, exist_ok=True)
-            resources_dir.mkdir(parents=True, exist_ok=True)
-            
-            print(f"✅ 用户目录已初始化: {user_dir}")
-            return True
-        return False
+        print(f"✅ 用户目录已初始化: {resources_dir}")
+        return True
     except Exception as e:
         print(f"⚠️ 初始化用户目录失败: {e}")
         return False

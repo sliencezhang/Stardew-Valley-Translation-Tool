@@ -77,7 +77,7 @@ class TranslationEngine(QObject):
             
             if api_key or provider == "local":
                 self.api_client = APIClientFactory.create_client(
-                    provider, api_key, api_url, model, self.temperature
+                    provider, api_key, api_url, model, self.temperature, config.api_timeout
                 )
                 provider_name = self.api_client.get_name()
                 signal_bus.log_message.emit("INFO", f"🔌 使用API: {provider_name} | URL: {api_url} | 模型: {model}", {})

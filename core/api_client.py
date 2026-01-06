@@ -11,11 +11,12 @@ from core.config import config
 class APIClient(ABC):
     """API客户端抽象基类"""
     
-    def __init__(self, api_key: str, base_url: str, model: str, temperature: float = 0.3):
+    def __init__(self, api_key: str, base_url: str, model: str, temperature: float = 0.3, timeout: int = 120):
         self.api_key = api_key
         self.base_url = base_url
         self.model = model
         self.temperature = temperature
+        self.timeout = timeout
     
     @abstractmethod
     def call_api(self, prompt: str) -> str:
@@ -57,7 +58,7 @@ class SiliconFlowClient(APIClient):
             self.base_url,
             headers=headers,
             json=data,
-            timeout=60,
+            timeout=self.timeout,
             proxies=config.get_proxies() if hasattr(config, 'get_proxies') else None
         )
         response.raise_for_status()
@@ -95,7 +96,7 @@ class DeepSeekClient(APIClient):
             self.base_url,
             headers=headers,
             json=data,
-            timeout=60,
+            timeout=self.timeout,
             proxies=config.get_proxies() if hasattr(config, 'get_proxies') else None
         )
         response.raise_for_status()
@@ -106,6 +107,9 @@ class DeepSeekClient(APIClient):
 
 class LocalAPIClient(APIClient):
     """本地API客户端 (如 LM Studio)"""
+    
+    def __init__(self, api_key: str, base_url: str, model: str, temperature: float = 0.3, timeout: int = 180):
+        super().__init__(api_key, base_url, model, temperature, timeout)
     
     def get_name(self) -> str:
         return "本地API"
@@ -132,7 +136,7 @@ class LocalAPIClient(APIClient):
             self.base_url,
             headers=headers,
             json=data,
-            timeout=120
+            timeout=self.timeout
         )
         response.raise_for_status()
 
@@ -143,8 +147,8 @@ class LocalAPIClient(APIClient):
 class OpenAICompatibleClient(APIClient):
     """OpenAI兼容API客户端（通用）"""
     
-    def __init__(self, api_key: str, base_url: str, model: str, temperature: float = 0.3, name: str = "OpenAI兼容API"):
-        super().__init__(api_key, base_url, model, temperature)
+    def __init__(self, api_key: str, base_url: str, model: str, temperature: float = 0.3, name: str = "OpenAI兼容API", timeout: int = 120):
+        super().__init__(api_key, base_url, model, temperature, timeout)
         self.provider_name = name
     
     def get_name(self) -> str:
@@ -173,7 +177,7 @@ class OpenAICompatibleClient(APIClient):
             self.base_url,
             headers=headers,
             json=data,
-            timeout=60,
+            timeout=self.timeout,
             proxies=config.get_proxies() if hasattr(config, 'get_proxies') else None
         )
         response.raise_for_status()
@@ -244,7 +248,7 @@ class APIClientFactory:
     }
     
     @classmethod
-    def create_client(cls, provider: str, api_key: str, base_url: str = None, model: str = None, temperature: float = 0.3) -> APIClient:
+    def create_client(cls, provider: str, api_key: str, base_url: str = None, model: str = None, temperature: float = 0.3, timeout: int = 120) -> APIClient:
         """创建API客户端实例"""
         if provider not in cls.PROVIDERS:
             raise ValueError(f"不支持的API提供商: {provider}")
@@ -260,9 +264,9 @@ class APIClientFactory:
         
         # 如果是OpenAICompatibleClient，需要传递name参数
         if client_class == OpenAICompatibleClient:
-            return client_class(api_key, base_url, model, temperature, provider_config["name"])
+            return client_class(api_key, base_url, model, temperature, provider_config["name"], timeout)
         else:
-            return client_class(api_key, base_url, model, temperature)
+            return client_class(api_key, base_url, model, temperature, timeout)
     
     @classmethod
     def get_providers(cls) -> List[str]:

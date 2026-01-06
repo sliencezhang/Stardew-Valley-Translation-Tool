@@ -24,40 +24,26 @@ class TerminologyManager(QObject):
     @staticmethod
     def get_default_prompt(prompt: str) -> Dict:
         """获取默认提示词"""
-        from .path_utils import get_readable_resource_path, get_resource_path, is_frozen, is_nuitka_onefile
+        from .config import get_resource_path
         
-        file_path = get_readable_resource_path("default_prompts.json")
+        file_path = get_resource_path("resources/default_prompts.json")
         
-        # 如果是打包环境且用户目录下的文件不存在，需要从打包的resources复制
-        if (is_frozen() or is_nuitka_onefile()) and not file_path.exists():
-            # 从打包的resources目录读取默认数据
-            default_path = get_resource_path("default_prompts.json")
-            signal_bus.log_message.emit("INFO", f"[术语表] 用户目录文件不存在，从默认位置读取: {default_path}", {})
-            
-            if default_path.exists():
-                # 读取默认数据并复制到用户目录
-                from .path_utils import get_writable_resource_path
-                default_data = file_tool.read_json_file(str(default_path))
-                save_path = get_writable_resource_path("default_prompts.json")
-                save_path.parent.mkdir(parents=True, exist_ok=True)
-                file_tool.save_json_file(default_data, str(save_path))
-                signal_bus.log_message.emit("INFO", f"[术语表] 已复制到用户目录: {save_path}", {})
-                return default_data.get(prompt)
-            else:
-                signal_bus.log_message.emit("WARNING", f"[术语表] 默认文件不存在: {default_path}", {})
-                return {}
+        # 直接读取文件，如果不存在则使用默认值
+        if not file_path.exists():
+            signal_bus.log_message.emit("WARNING", f"[术语表] 文件不存在: {file_path}", {})
+            return {}
         
         # 正常读取
         return file_tool.read_json_file(str(file_path)).get(prompt)
 
     @staticmethod
     def save_default_prompt(prompt_data: Dict) -> None:
-        from .path_utils import get_writable_resource_path, is_frozen, is_nuitka_onefile
+        from .config import get_resource_path
         
-        save_path = get_writable_resource_path("default_prompts.json")
+        save_path = get_resource_path("resources/default_prompts.json")
         save_path.parent.mkdir(parents=True, exist_ok=True)
         
-        env = "打包环境" if (is_frozen() or is_nuitka_onefile()) else "开发环境"
+        env = "运行环境"
         signal_bus.log_message.emit("INFO", f"[术语表] {env}，保存默认提示词到: {save_path}", {})
         return file_tool.save_json_file(prompt_data, str(save_path))
 

@@ -475,17 +475,8 @@ class StardewTranslationTool(QMainWindow):
     def open_project(self):
         """打开项目"""
         try:
-            # 设置默认目录为应用所在目录
-            try:
-                from core.path_utils import get_application_directory
-                default_dir = str(get_application_directory())
-            except ImportError:
-                import sys
-                from pathlib import Path
-                if getattr(sys, 'frozen', False):
-                    default_dir = str(Path(sys.executable).parent)
-                else:
-                    default_dir = ""
+            from core.config import get_resource_path
+            default_dir = str(get_resource_path("."))
             
             project_folder = QFileDialog.getExistingDirectory(self, "选择项目文件夹", default_dir)
             if project_folder:

@@ -44,6 +44,7 @@ class GlobalSettingsDialog(QDialog):
 
         self.temperature_spin = None
         self.batch_size_spin = None
+        self.api_timeout_spin = None
         self.terminology_file = (Path(__file__).parent / "../resources/terminology.json").resolve()
         
         # 背景图片初始化
@@ -260,6 +261,8 @@ class GlobalSettingsDialog(QDialog):
         settings_items = [
             ("每批翻译数量:", "batch_size_spin", config.default_batch_size,
              "每次发送给API的翻译条目数量", 1, 50, ""),
+            ("API超时时间(秒):", "api_timeout_spin", config.api_timeout,
+             "API请求超时时间，网络较慢时可适当增加", 30, 300, ""),
             ("温度参数:", "temperature_spin", int(config.temperature * 100),
              "控制翻译的创造性，越低越保守", 0, 100, "%")
         ]
@@ -708,6 +711,7 @@ class GlobalSettingsDialog(QDialog):
 
         # 翻译设置
         self.batch_size_spin.setValue(config.default_batch_size)
+        self.api_timeout_spin.setValue(config.api_timeout)
         self.temperature_spin.setValue(int(config.temperature * 100))
 
         # 缓存
@@ -846,36 +850,18 @@ class GlobalSettingsDialog(QDialog):
 
     def _load_default_terminology(self):
         """加载默认术语表"""
-        from core.path_utils import (get_readable_resource_path, get_writable_resource_path, 
-                                   is_frozen, is_nuitka_onefile, get_resource_path)
+        from core.config import get_resource_path
         
-        
-        
-        load_path = get_readable_resource_path("terminology.json")
-        env = "打包环境" if (is_frozen() or is_nuitka_onefile()) else "开发环境"
+        load_path = get_resource_path("resources/terminology.json")
+        env = "运行环境"
         signal_bus.log_message.emit("INFO", f"[术语表] {env}，从文件加载: {load_path}", {})
         
-        # 如果是打包环境且用户目录下的文件不存在，需要从打包的resources复制
-        if env == "打包环境" and not load_path.exists():
-            # 从打包的resources目录读取默认数据
-            default_path = get_resource_path("terminology.json")
-            signal_bus.log_message.emit("INFO", f"[术语表] 用户目录文件不存在，从默认位置读取: {default_path}", {})
-            
-            if default_path.exists():
-                # 读取默认数据
-                terminology_data = file_tool.read_json_file(str(default_path))
-                # 保存到用户目录
-                save_path = get_writable_resource_path("terminology.json")
-                save_path.parent.mkdir(parents=True, exist_ok=True)
-                file_tool.save_json_file(terminology_data, str(save_path))
-                signal_bus.log_message.emit("INFO", f"[术语表] 已复制到用户目录: {save_path}", {})
-            else:
-                # 如果默认文件也不存在，使用空字典
-                terminology_data = {}
-                signal_bus.log_message.emit("WARNING", f"[术语表] 默认文件不存在: {default_path}", {})
-        else:
-            # 正常读取
+        # 直接读取文件，如果不存在则使用空字典
+        if load_path.exists():
             terminology_data = file_tool.read_json_file(str(load_path))
+        else:
+            terminology_data = {}
+            signal_bus.log_message.emit("WARNING", f"[术语表] 文件不存在: {load_path}", {})
         
         self._load_dict_to_table(terminology_data, self.glossary_table)
 
@@ -1047,6 +1033,7 @@ class GlobalSettingsDialog(QDialog):
 
         # 更新其他配置
         config.default_batch_size = self.batch_size_spin.value()
+        config.api_timeout = self.api_timeout_spin.value()
         config.temperature = self.temperature_spin.value() / 100.0
         config.use_background = self.use_background_checkbox.isChecked()
         config.custom_background_light = self.custom_bg_light_edit.text().strip()
@@ -1068,6 +1055,7 @@ class GlobalSettingsDialog(QDialog):
             'api_url': api_url,
             'api_model': api_model,
             'batch_size': config.default_batch_size,
+            'api_timeout': config.api_timeout,
             'temperature': config.temperature,
             'terminology': glossary
         }
@@ -1078,14 +1066,12 @@ class GlobalSettingsDialog(QDialog):
 
     def _save_terminology_file(self, glossary: Dict[str, str]):
         """保存术语表到文件"""
-        from core.path_utils import get_writable_resource_path
+        from core.config import get_resource_path
         
-        save_path = get_writable_resource_path("terminology.json")
+        save_path = get_resource_path("resources/terminology.json")
         save_path.parent.mkdir(parents=True, exist_ok=True)
         
-        from core.path_utils import is_frozen, is_nuitka_onefile
-        
-        env = "打包环境" if (is_frozen() or is_nuitka_onefile()) else "开发环境"
+        env = "运行环境"
         signal_bus.log_message.emit("INFO", f"[术语表] {env}，保存到: {save_path}", {})
         file_tool.save_json_file(glossary, str(save_path))
 

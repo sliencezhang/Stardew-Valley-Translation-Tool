@@ -196,11 +196,10 @@ class UpdateChecker:
         4. 检查github后保存timestamp
         5. 新增：检查当前版本与缓存中的版本是否一致，如果不一致说明已更新，重新检查
         """
-        from .path_utils import (get_readable_resource_path, get_resource_path, 
-                           is_frozen, is_nuitka_onefile)
+        from .config import get_resource_path
         
-        cache_file = get_readable_resource_path("update_cache.json")
-        env = "打包环境" if (is_frozen() or is_nuitka_onefile()) else "开发环境"
+        cache_file = get_resource_path("resources/update_cache.json")
+        env = "运行环境"
         
         # 1. 检查是否需要跳过缓存
         if force_check:
@@ -264,8 +263,8 @@ class UpdateChecker:
     
     def _get_cache_file(self) -> Path:
         """获取缓存文件路径（只使用resources目录）"""
-        from .path_utils import get_resource_path
-        return get_resource_path("update_cache.json")
+        from .config import get_resource_path
+        return get_resource_path("resources/update_cache.json")
     
     def _check_and_cache(self) -> dict:
         """检查更新并缓存结果"""
@@ -311,7 +310,7 @@ class UpdateChecker:
     
     def _save_cache(self, update_info: dict):
         """保存检查结果到缓存"""
-        from .path_utils import get_writable_resource_path
+        from .config import get_resource_path
         
         # 确保update_info包含正确的current_version
         if 'current_version' not in update_info:
@@ -323,12 +322,12 @@ class UpdateChecker:
             "repository": f"{self.repo_owner}/{self.repo_name}"
         }
         
-        from .path_utils import get_writable_resource_path, is_frozen, is_nuitka_onefile
+        from .config import get_resource_path
         
-        cache_file = get_writable_resource_path("update_cache.json")
+        cache_file = get_resource_path("resources/update_cache.json")
         cache_file.parent.mkdir(parents=True, exist_ok=True)
         
-        env = "打包环境" if (is_frozen() or is_nuitka_onefile()) else "开发环境"
+        env = "运行环境"
         
         try:
             with open(cache_file, 'w', encoding='utf-8') as f:
