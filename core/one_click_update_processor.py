@@ -46,8 +46,8 @@ class OneClickUpdateProcessor:
                 if not os.path.exists(path):
                     return {'成功': False, '消息': f'中文mod路径不存在: {path}'}
             
-            # 多文件夹模式检查
-            is_multi_folder = len(en_mod_paths) > 1 or len(zh_mod_paths) > 1
+            # 多文件夹模式检查 - 只有当英文和中文mod文件夹数量都大于1时才进行名称匹配验证
+            is_multi_folder = len(en_mod_paths) > 1 and len(zh_mod_paths) > 1
             if is_multi_folder:
                 signal_bus.log_message.emit("INFO", "检测到多文件夹模式，将进行文件夹名称匹配", {})
                 if not self._validate_folder_names(en_mod_paths, zh_mod_paths):
@@ -223,6 +223,9 @@ class OneClickUpdateProcessor:
             en_mod_map = {Path(p).name: p for p in en_paths}
             zh_mod_map = {Path(p).name: p for p in zh_paths}
             
+            # 检查是否是单文件夹模式
+            is_single_folder = len(en_paths) == 1 and len(zh_paths) == 1
+            
             # 收集每个英文mod的文件
             for i, en_path in enumerate(en_paths):
                 mod_name = Path(en_path).name
@@ -246,7 +249,20 @@ class OneClickUpdateProcessor:
                         mod_name
                     )
                 else:
-                    signal_bus.log_message.emit("WARNING", f"未找到对应的中文mod: {mod_name}", {})
+                    # 在单文件夹模式下，如果只有一个中文mod路径，使用英文mod名作为前缀
+                    if is_single_folder and len(zh_paths) == 1:
+                        zh_path = zh_paths[0]
+                        if os.path.exists(os.path.join(zh_path, 'i18n')):
+                            signal_bus.log_message.emit("INFO", f"单文件夹模式：使用英文mod名 '{mod_name}' 作为中文文件前缀", {})
+                            self._collect_chinese_files(
+                                os.path.join(zh_path, 'i18n'),
+                                zh_folder,
+                                mod_name  # 使用英文mod名作为前缀
+                            )
+                        else:
+                            signal_bus.log_message.emit("WARNING", f"中文mod路径不存在i18n文件夹: {zh_path}", {})
+                    else:
+                        signal_bus.log_message.emit("WARNING", f"未找到对应的中文mod: {mod_name}", {})
             
             # 先收集所有需要翻译的内容
             all_translation_data = {}
@@ -267,14 +283,18 @@ class OneClickUpdateProcessor:
                 if zh_path:
                     signal_bus.log_message.emit("DEBUG", f"找到对应的中文mod: {zh_path}", {})
                 else:
-                    signal_bus.log_message.emit("WARNING", f"未找到对应的中文mod: {mod_name}", {})
-                    zh_path = None  # 设置为None，后续代码会处理
+                    # 在单文件夹模式下，如果只有一个中文mod路径，直接使用它
+                    if len(zh_paths) == 1:
+                        zh_path = zh_paths[0]
+                    else:
+                        signal_bus.log_message.emit("WARNING", f"未找到对应的中文mod: {mod_name}", {})
+                        zh_path = None  # 设置为None，后续代码会处理
                 
                 # 1. 收集i18n文件（已在前面完成）
                 
                 # 2. 收集manifest文件
                 en_manifest = os.path.join(en_path, 'manifest.json')
-                zh_manifest = os.path.join(zh_path, 'manifest.json')
+                zh_manifest = os.path.join(zh_path, 'manifest.json') if zh_path else None
                 
                 if os.path.exists(en_manifest):
                     manifest_content = self._extract_manifest_fields(en_manifest)
@@ -391,8 +411,12 @@ class OneClickUpdateProcessor:
                         # 查找对应的中文mod（根据文件夹名称）
                         zh_path = zh_mod_map.get(mod_name)
                         if not zh_path:
-                            signal_bus.log_message.emit("WARNING", f"处理输出时未找到对应的中文mod: {mod_name}", {})
-                            zh_path = None  # 设置为None，后续代码会处理
+                            # 在单文件夹模式下，如果只有一个中文mod路径，直接使用它
+                            if len(zh_paths) == 1:
+                                zh_path = zh_paths[0]
+                            else:
+                                signal_bus.log_message.emit("WARNING", f"处理输出时未找到对应的中文mod: {mod_name}", {})
+                                zh_path = None  # 设置为None，后续代码会处理
                         
                         # 创建该mod在项目output文件夹中的目录
                         mod_output_dir = os.path.join(output_folder_path, mod_name)
@@ -489,8 +513,14 @@ class OneClickUpdateProcessor:
                 dest_file = os.path.join(dest_en_folder, f"{mod_name}_default.json")
                 shutil.copy2(default_file, dest_file)
     
-    def _collect_chinese_files(self, source_i18n: str, dest_zh_folder: str, mod_name: str):
-        """收集中文文件（zh.json或ZH文件夹中的文件）到项目zh文件夹"""
+    def _collect_chinese_files(self, source_i18n: str, dest_zh_folder: str, mod_name: str, force_prefix: str = None):
+        """收集中文文件（zh.json或ZH文件夹中的文件）到项目zh文件夹
+        Args:
+            source_i18n: 源i18n文件夹路径
+            dest_zh_folder: 目标zh文件夹路径
+            mod_name: 原始mod名称（用于日志）
+            force_prefix: 强制使用的前缀（用于单文件夹模式）
+        """
         if not os.path.exists(source_i18n):
             return
         
@@ -508,6 +538,9 @@ class OneClickUpdateProcessor:
                 if item.lower() in ['zh', 'chinese']:
                     zh_folder = item_path
         
+        # 确定使用的前缀
+        prefix = force_prefix if force_prefix else mod_name
+        
         if has_subdirs and zh_folder:
             # 有子文件夹的情况：复制ZH文件夹中的所有JSON文件
             for root, dirs, files in os.walk(zh_folder):
@@ -518,11 +551,11 @@ class OneClickUpdateProcessor:
                         
                         # 确定目标文件名
                         if rel_path.lower() == 'zh.json':
-                            # zh.json对应default.json，所以改为mod_name_default.json
-                            dest_file = os.path.join(dest_zh_folder, f"{mod_name}_default.json")
+                            # zh.json对应default.json，所以改为prefix_default.json
+                            dest_file = os.path.join(dest_zh_folder, f"{prefix}_default.json")
                         else:
                             # 其他文件保持原名，但添加前缀
-                            dest_file = os.path.join(dest_zh_folder, f"{mod_name}_{rel_path}")
+                            dest_file = os.path.join(dest_zh_folder, f"{prefix}_{rel_path}")
                         
                         os.makedirs(os.path.dirname(dest_file), exist_ok=True)
                         shutil.copy2(src_file, dest_file)
@@ -534,8 +567,8 @@ class OneClickUpdateProcessor:
             for file_name in chinese_files:
                 file_path = os.path.join(source_i18n, file_name)
                 if os.path.exists(file_path):
-                    # zh.json对应default.json，所以改为mod_name_default.json
-                    dest_file = os.path.join(dest_zh_folder, f"{mod_name}_default.json")
+                    # zh.json对应default.json，所以改为prefix_default.json
+                    dest_file = os.path.join(dest_zh_folder, f"{prefix}_default.json")
                     shutil.copy2(file_path, dest_file)
                     found_zh_file = True
                     break
@@ -546,7 +579,7 @@ class OneClickUpdateProcessor:
                     # 检查是否可能是中文文件（包含zh、chinese等关键词）
                     if 'zh' in file_name.lower() or 'chinese' in file_name.lower() or 'cn' in file_name.lower():
                         file_path = os.path.join(source_i18n, file_name)
-                        dest_file = os.path.join(dest_zh_folder, f"{mod_name}_{file_name}")
+                        dest_file = os.path.join(dest_zh_folder, f"{prefix}_{file_name}")
                         shutil.copy2(file_path, dest_file)
                         signal_bus.log_message.emit("DEBUG", f"复制中文文件: {file_name} -> {os.path.basename(dest_file)}", {})
 
@@ -1455,23 +1488,25 @@ class OneClickUpdateProcessor:
                         os.remove(zh_content)
                         signal_bus.log_message.emit("DEBUG", f"清理ZH文件夹中的content.json", {})
             
-            # 复制Portraits文件夹
-            zh_portraits = os.path.join(zh_mod_path, 'assets', 'Portraits')
-            if os.path.exists(zh_portraits):
-                en_portraits = os.path.join(output_dir, 'assets', 'Portraits')
-                try:
-                    shutil.rmtree(en_portraits)
-                except (PermissionError, OSError):
-                    signal_bus.log_message.emit("DEBUG", "删除Portraits文件夹失败，可能不存在", {})
-                shutil.copytree(zh_portraits, en_portraits, dirs_exist_ok=True)
-                signal_bus.log_message.emit("SUCCESS", "Portraits文件夹复制完成", {})
+            # 复制Portraits文件夹（仅在zh_mod_path存在时执行）
+            if zh_mod_path:
+                zh_portraits = os.path.join(zh_mod_path, 'assets', 'Portraits')
+                if os.path.exists(zh_portraits):
+                    en_portraits = os.path.join(output_dir, 'assets', 'Portraits')
+                    try:
+                        shutil.rmtree(en_portraits)
+                    except (PermissionError, OSError):
+                        signal_bus.log_message.emit("DEBUG", "删除Portraits文件夹失败，可能不存在", {})
+                    shutil.copytree(zh_portraits, en_portraits, dirs_exist_ok=True)
+                    signal_bus.log_message.emit("SUCCESS", "Portraits文件夹复制完成", {})
             
-            # 复制config.json文件
-            zh_config = os.path.join(zh_mod_path, 'config.json')
-            if os.path.exists(zh_config):
-                en_config = os.path.join(output_dir, 'config.json')
-                shutil.copy2(zh_config, en_config)
-                signal_bus.log_message.emit("SUCCESS", "config.json文件复制完成", {})
+            # 复制config.json文件（仅在zh_mod_path存在时执行）
+            if zh_mod_path:
+                zh_config = os.path.join(zh_mod_path, 'config.json')
+                if os.path.exists(zh_config):
+                    en_config = os.path.join(output_dir, 'config.json')
+                    shutil.copy2(zh_config, en_config)
+                    signal_bus.log_message.emit("SUCCESS", "config.json文件复制完成", {})
             
         except Exception as e:
             signal_bus.log_message.emit("ERROR", f"复制其他文件失败: {str(e)}", {})
@@ -1480,6 +1515,10 @@ class OneClickUpdateProcessor:
     
     def _validate_folder_names(self, en_paths: List[str], zh_paths: List[str]) -> bool:
         """验证多文件夹模式下的文件夹名称是否匹配"""
+        # 如果是单文件夹模式，直接返回True
+        if len(en_paths) <= 1 or len(zh_paths) <= 1:
+            return True
+            
         en_names = [Path(p).name for p in en_paths]
         zh_names = [Path(p).name for p in zh_paths]
         
