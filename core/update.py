@@ -228,7 +228,24 @@ class UpdateChecker:
 
             # 使用缓存数据，但确保current_version是最新的
             update_info = cache_data.get('update_info', {})
+            old_current_version = update_info.get('current_version')
             update_info['current_version'] = self.current_version
+            
+            # 如果缓存中有latest_version，重新比较版本以确保has_update状态正确
+            if 'latest_version' in update_info:
+                version_comparison = self.compare_versions(update_info['latest_version'])
+                # 更新has_update状态，但保留其他缓存信息
+                update_info['has_update'] = version_comparison.get('has_update', False)
+                if version_comparison.get('is_latest'):
+                    update_info['is_latest'] = True
+            
+            # 如果current_version发生变化，保存更新后的缓存（但不更新时间戳）
+            if old_current_version != self.current_version:
+                # 保存更新后的缓存，但保留原始时间戳
+                cache_data['update_info'] = update_info
+                cache_file = get_resource_path("resources/update_cache.json")
+                with open(cache_file, 'w', encoding='utf-8') as f:
+                    json.dump(cache_data, f, indent=2, ensure_ascii=False)
             return update_info
 
         except (json.JSONDecodeError, KeyError, ValueError) as e:
