@@ -175,8 +175,9 @@ class TranslationExecutor:
         else:
             return {'成功': False, '消息': f'未知任务类型: {task_type}'}
         
-        # 如果不是一键更新任务，清理current_processor
-        if task_type != "one_click_update":
+        # 如果不是一键更新任务或质量检查任务，清理current_processor
+        # 质量检查任务可能是一键更新流程的一部分，所以也不清理
+        if task_type not in ["one_click_update", "quality_review"]:
             self._current_processor = None
         
         return result
