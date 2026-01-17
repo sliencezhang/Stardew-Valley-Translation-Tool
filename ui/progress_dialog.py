@@ -1060,6 +1060,24 @@ class TranslationProgressDialog(QDialog):
         self.elapsed_timer.stop()
         self.stop_batch_countdown()
 
+        # 停止批次显示定时器并处理所有待显示项
+        if self.batch_timer:
+            self.batch_timer.stop()
+            self.batch_timer = None
+        
+        # 处理所有剩余的待显示项
+        while self.pending_details:
+            detail = self.pending_details.pop(0)
+            # 在操作完成时，我们仍然需要更新统计信息，即使不显示在表格中
+            self._update_item_statistics(detail)
+        
+        # 刷新界面
+        self._force_refresh_table(self.details_table)
+        self.details_table.scrollToBottom()
+        
+        # 强制更新统计信息，确保进度条显示100%
+        self._force_update_statistics_on_completion()
+
         if success:
             self.status_label.setText("完成")
             signal_bus.log_message.emit("SUCCESS","操作完成！",{})
@@ -1082,6 +1100,41 @@ class TranslationProgressDialog(QDialog):
             y = parent_geometry.top() + 20
             self.move(x, y)
 
+    def _update_item_statistics(self, detail):
+        """更新单项统计信息（不显示在表格中）"""
+        # 更新计数
+        status = detail.get('status', '等待翻译')
+        self._update_status_count(status, 1)
+        
+        # 更新文件统计
+        if status in ["完成", "翻译中", "增量翻译", "命中缓存", "成功"] and detail['filename'] in self.file_items and detail['filename'] != "quality_issues":
+            file_info = self.file_items[detail['filename']]
+            file_info['译文'] = file_info.get('译文', 0) + 1
+            
+            # 计算进度
+            if file_info['总数'] > 0:
+                progress = min(100, int((file_info['译文'] / file_info['总数']) * 100))
+                file_status = "完成" if progress == 100 else "翻译中"
+                self.update_file_progress(detail['filename'], file_status, progress, file_info['译文'])
+    
+    def _force_update_statistics_on_completion(self):
+        """在操作完成时强制更新统计信息"""
+        # 确保所有文件的翻译数等于总数
+        for filename, file_info in self.file_items.items():
+            if filename != "quality_issues":
+                total = file_info.get('总数', 0)
+                if total > 0:
+                    file_info['译文'] = total
+                    self.update_file_progress(filename, "完成", 100, total)
+        
+        # 更新统计信息
+        self._update_statistics()
+        
+        # 强制设置进度条为100%
+        self.overall_progress.setValue(100)
+        self.progress_percent.setText("100%")
+        self.success_rate_label.setText("100.0%")
+    
     def _send_current_stats_to_log(self):
         """发送当前显示的统计数据到日志"""
         # 如果还有待处理的项，等待处理完成
