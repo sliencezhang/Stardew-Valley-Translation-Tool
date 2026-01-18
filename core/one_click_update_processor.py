@@ -1,5 +1,6 @@
 import os
 import json
+import os
 import shutil
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -1493,11 +1494,10 @@ class OneClickUpdateProcessor:
                 zh_portraits = os.path.join(zh_mod_path, 'assets', 'Portraits')
                 if os.path.exists(zh_portraits):
                     en_portraits = os.path.join(output_dir, 'assets', 'Portraits')
-                    try:
-                        shutil.rmtree(en_portraits)
-                    except (PermissionError, OSError):
-                        signal_bus.log_message.emit("DEBUG", "删除Portraits文件夹失败，可能不存在", {})
-                    shutil.copytree(zh_portraits, en_portraits, dirs_exist_ok=True)
+                    # 确保目标目录存在
+                    os.makedirs(en_portraits, exist_ok=True)
+                    # 直接复制覆盖，保留新版本中可能存在的新文件
+                    self._copy_directory_contents(zh_portraits, en_portraits)
                     signal_bus.log_message.emit("SUCCESS", "Portraits文件夹复制完成", {})
             
             # 复制config.json文件（仅在zh_mod_path存在时执行）
@@ -1511,7 +1511,26 @@ class OneClickUpdateProcessor:
         except Exception as e:
             signal_bus.log_message.emit("ERROR", f"复制其他文件失败: {str(e)}", {})
     
-    
+    def _copy_directory_contents(self, src_dir: str, dst_dir: str):
+        """递归复制目录内容，保留目标目录中已存在但源目录中不存在的文件"""
+        try:
+            # 确保目标目录存在
+            os.makedirs(dst_dir, exist_ok=True)
+            
+            # 遍历源目录中的所有项
+            for item in os.listdir(src_dir):
+                src_path = os.path.join(src_dir, item)
+                dst_path = os.path.join(dst_dir, item)
+                
+                if os.path.isdir(src_path):
+                    # 如果是目录，递归复制
+                    self._copy_directory_contents(src_path, dst_path)
+                else:
+                    # 如果是文件，直接复制覆盖
+                    shutil.copy2(src_path, dst_path)
+        except Exception as e:
+            signal_bus.log_message.emit("ERROR", f"复制目录内容失败: {str(e)}", {})
+            raise
     
     def _validate_folder_names(self, en_paths: List[str], zh_paths: List[str]) -> bool:
         """验证多文件夹模式下的文件夹名称是否匹配"""
